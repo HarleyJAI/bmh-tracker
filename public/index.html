@@ -1,1 +1,636 @@
-/Users/jovonharley/Downloads/bmh-patient-tracker/public/index.html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BMH Patient Journey Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --navy:#0a1628;--navy-mid:#142240;--navy-light:#1e3a5f;
+  --teal:#00c5a1;--teal-dim:#009e82;--teal-faint:#e0faf5;
+  --amber:#f5a623;--amber-faint:#fff8eb;
+  --red:#e8453c;--red-faint:#fef2f1;
+  --green:#2ecc71;--green-faint:#edfbf3;
+  --purple:#7c5cbf;--purple-faint:#f3f0ff;
+  --slate:#8896ab;--slate-light:#c4cdd9;--border:#e4eaf2;
+  --white:#ffffff;--surface:#f8fafc;--surface2:#f1f5f9;
+  --text:#0d1b2e;--text-mid:#435166;--text-soft:#8896ab;
+  --font:'DM Sans',sans-serif;--mono:'DM Mono',monospace;
+  --radius:10px;--radius-lg:14px;--radius-xl:20px;
+}
+body{font-family:var(--font);background:var(--surface);color:var(--text);min-height:100vh;font-size:14px}
+
+/* ── Top Bar ── */
+.topbar{background:var(--navy);padding:14px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
+.topbar-brand{display:flex;align-items:center;gap:10px}
+.brand-mark{width:32px;height:32px;background:var(--teal);border-radius:8px;display:flex;align-items:center;justify-content:center}
+.brand-mark svg{width:18px;height:18px;fill:var(--navy)}
+.brand-name{color:var(--white);font-size:15px;font-weight:600;letter-spacing:-.02em}
+.brand-sub{color:var(--slate);font-size:11px;letter-spacing:.04em;text-transform:uppercase}
+.topbar-right{display:flex;align-items:center;gap:12px}
+.live-dot{width:8px;height:8px;border-radius:50%;background:var(--teal);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.live-label{color:var(--slate);font-size:12px}
+.add-btn{background:var(--teal);color:var(--navy);border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font);transition:background .15s}
+.add-btn:hover{background:var(--teal-dim)}
+
+/* ── Layout ── */
+.layout{display:grid;grid-template-columns:220px 1fr;min-height:calc(100vh - 61px)}
+
+/* ── Sidebar ── */
+.sidebar{background:var(--white);border-right:1px solid var(--border);padding:20px 0}
+.sidebar-section{margin-bottom:24px}
+.sidebar-label{font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--text-soft);padding:0 16px 8px}
+.nav-item{display:flex;align-items:center;justify-content:space-between;padding:9px 16px;cursor:pointer;border-left:3px solid transparent;transition:all .12s;color:var(--text-mid);font-size:13px}
+.nav-item:hover{background:var(--surface);color:var(--text)}
+.nav-item.active{background:var(--teal-faint);color:var(--teal-dim);border-left-color:var(--teal);font-weight:500}
+.nav-count{background:var(--surface2);color:var(--text-soft);font-size:11px;font-weight:600;padding:2px 7px;border-radius:20px}
+.nav-item.active .nav-count{background:var(--teal);color:var(--navy)}
+.nav-dot{width:8px;height:8px;border-radius:50%;margin-right:8px;display:inline-block;flex-shrink:0}
+
+/* ── Main ── */
+.main{padding:24px;overflow-y:auto}
+.main-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;gap:12px;flex-wrap:wrap}
+.search-wrap{position:relative;flex:1;max-width:300px}
+.search-wrap input{width:100%;background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:9px 12px 9px 36px;font-size:13px;color:var(--text);font-family:var(--font);outline:none;transition:border .15s}
+.search-wrap input:focus{border-color:var(--teal)}
+.search-icon{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--slate);font-size:15px}
+.sort-select{background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:8px 12px;font-size:13px;color:var(--text-mid);font-family:var(--font);outline:none;cursor:pointer}
+
+/* ── Stats Strip ── */
+.stats-strip{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:20px}
+.stat-card{background:var(--white);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px 16px;transition:box-shadow .15s}
+.stat-card:hover{box-shadow:0 2px 12px rgba(0,0,0,.06)}
+.stat-label{font-size:11px;color:var(--text-soft);margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em}
+.stat-val{font-size:26px;font-weight:600;color:var(--text);letter-spacing:-.02em}
+.stat-card.highlight{background:var(--navy);border-color:var(--navy)}
+.stat-card.highlight .stat-label{color:rgba(255,255,255,.5)}
+.stat-card.highlight .stat-val{color:var(--teal)}
+
+/* ── Patient Cards ── */
+.patient-grid{display:flex;flex-direction:column;gap:10px}
+.pcard{background:var(--white);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;transition:box-shadow .15s,border-color .15s;cursor:pointer}
+.pcard:hover{box-shadow:0 2px 16px rgba(0,0,0,.07);border-color:var(--slate-light)}
+.pcard.open{border-color:var(--teal);box-shadow:0 0 0 3px rgba(0,197,161,.08)}
+.pcard-top{display:flex;align-items:center;gap:14px;padding:16px 18px}
+.avatar{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;flex-shrink:0;font-family:var(--mono)}
+.pcard-info{flex:1;min-width:0}
+.pcard-name{font-size:15px;font-weight:600;color:var(--text);margin-bottom:2px}
+.pcard-meta{font-size:12px;color:var(--text-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pcard-right{display:flex;align-items:center;gap:10px;flex-shrink:0}
+.source-tag{font-size:10px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;padding:3px 8px;border-radius:6px;background:var(--surface2);color:var(--text-soft)}
+.source-tag.ghl{background:#e8f5e9;color:#2e7d32}
+.chevron{color:var(--slate);font-size:13px;transition:transform .2s}
+.pcard.open .chevron{transform:rotate(180deg)}
+
+/* Journey bar */
+.journey-wrap{padding:0 18px 14px;display:flex;align-items:center;gap:4px}
+.j-seg{height:4px;flex:1;border-radius:3px;background:var(--surface2);transition:background .3s}
+.j-seg.done{background:var(--teal)}
+.j-seg.warn{background:var(--amber)}
+.j-seg.danger{background:var(--red)}
+.j-seg.purple{background:var(--purple)}
+.j-label{font-size:10px;color:var(--text-soft);margin-left:8px;white-space:nowrap}
+
+/* Status badge */
+.sbadge{font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;white-space:nowrap}
+.sb-received{background:var(--surface2);color:var(--text-mid)}
+.sb-scheduled{background:var(--purple-faint);color:var(--purple)}
+.sb-completed{background:var(--green-faint);color:#1a8a4a}
+.sb-incomplete{background:var(--amber-faint);color:#b97c0a}
+.sb-unreachable{background:var(--red-faint);color:var(--red)}
+
+/* Detail Panel */
+.detail{display:none;padding:0 18px 18px;border-top:1px solid var(--border)}
+.pcard.open .detail{display:block}
+.detail-inner{padding-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.dsec{background:var(--surface);border-radius:var(--radius);padding:14px}
+.dsec.full{grid-column:1/-1}
+.dsec-title{font-size:10px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--text-soft);margin-bottom:10px}
+.drow{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--border);font-size:13px}
+.drow:last-child{border-bottom:none}
+.drow-label{color:var(--text-soft)}
+.drow-val{color:var(--text);font-weight:500;text-align:right}
+
+/* Stage timeline */
+.timeline{display:flex;flex-direction:column;gap:8px}
+.tl-row{display:flex;align-items:center;gap:10px;font-size:13px}
+.tl-dot{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0;border:2px solid var(--border)}
+.tl-dot.done{background:var(--teal-faint);border-color:var(--teal);color:var(--teal-dim)}
+.tl-dot.warn{background:var(--amber-faint);border-color:var(--amber);color:var(--amber)}
+.tl-dot.danger{background:var(--red-faint);border-color:var(--red);color:var(--red)}
+.tl-dot.pending{background:var(--surface2);border-color:var(--border);color:var(--slate)}
+.tl-info{flex:1}
+.tl-name{font-weight:500;color:var(--text)}
+.tl-date{font-size:11px;color:var(--text-soft);margin-top:1px}
+
+/* Update controls */
+.update-row{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start;margin-top:6px}
+.ctrl-select{background:var(--white);border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:12px;color:var(--text);font-family:var(--font);outline:none;cursor:pointer}
+.ctrl-input{background:var(--white);border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:12px;color:var(--text);font-family:var(--font);outline:none}
+.ctrl-input:focus,.ctrl-select:focus{border-color:var(--teal)}
+.save-btn{background:var(--teal);color:var(--navy);border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:var(--font)}
+.save-btn:hover{background:var(--teal-dim)}
+.del-btn{background:transparent;border:1px solid var(--red-faint);color:var(--red);border-radius:8px;padding:7px 12px;font-size:12px;cursor:pointer;font-family:var(--font);margin-left:auto}
+.notes-ta{width:100%;background:var(--white);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;color:var(--text);font-family:var(--font);resize:vertical;min-height:64px;outline:none}
+.notes-ta:focus{border-color:var(--teal)}
+.save-notes-row{display:flex;justify-content:flex-end;margin-top:6px}
+
+/* Modal */
+.modal-overlay{position:fixed;inset:0;background:rgba(10,22,40,.55);display:none;align-items:center;justify-content:center;z-index:200;padding:20px}
+.modal-overlay.open{display:flex}
+.modal{background:var(--white);border-radius:var(--radius-xl);padding:28px;width:100%;max-width:500px;max-height:90vh;overflow-y:auto}
+.modal h3{font-size:18px;font-weight:600;color:var(--text);margin-bottom:20px}
+.form-row{margin-bottom:14px}
+.form-label{font-size:12px;font-weight:500;color:var(--text-mid);margin-bottom:5px}
+.form-input{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;color:var(--text);font-family:var(--font);outline:none;transition:border .15s}
+.form-input:focus{border-color:var(--teal);background:var(--white)}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:20px}
+.btn-cancel{background:transparent;border:1px solid var(--border);border-radius:8px;padding:9px 18px;font-size:13px;cursor:pointer;color:var(--text-mid);font-family:var(--font)}
+.btn-submit{background:var(--teal);color:var(--navy);border:none;border-radius:8px;padding:9px 20px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font)}
+
+/* Empty state */
+.empty{text-align:center;padding:48px 20px;color:var(--text-soft)}
+.empty-icon{font-size:36px;margin-bottom:12px}
+.empty-title{font-size:15px;font-weight:500;color:var(--text-mid);margin-bottom:6px}
+
+/* Toast */
+.toast{position:fixed;bottom:24px;right:24px;background:var(--navy);color:var(--white);padding:12px 18px;border-radius:10px;font-size:13px;font-weight:500;transform:translateY(80px);opacity:0;transition:all .3s;z-index:500;border-left:3px solid var(--teal)}
+.toast.show{transform:translateY(0);opacity:1}
+
+@media(max-width:700px){
+  .layout{grid-template-columns:1fr}
+  .sidebar{display:none}
+  .stats-strip{grid-template-columns:repeat(2,1fr)}
+  .detail-inner{grid-template-columns:1fr}
+  .form-grid{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<!-- Top Bar -->
+<div class="topbar">
+  <div class="topbar-brand">
+    <div class="brand-mark">
+      <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/></svg>
+    </div>
+    <div>
+      <div class="brand-name">BMH Patient Tracker</div>
+      <div class="brand-sub">Beyond Mobile Health</div>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <div class="live-dot"></div>
+    <span class="live-label">Live sync</span>
+    <button class="add-btn" onclick="openModal()">+ Add Patient</button>
+  </div>
+</div>
+
+<div class="layout">
+
+  <!-- Sidebar Nav -->
+  <div class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-label">Filter by Status</div>
+      <div class="nav-item active" onclick="setFilter('all',this)" data-filter="all">
+        <span><span class="nav-dot" style="background:#8896ab"></span>All Patients</span>
+        <span class="nav-count" id="cnt-all">0</span>
+      </div>
+      <div class="nav-item" onclick="setFilter('received',this)" data-filter="received">
+        <span><span class="nav-dot" style="background:#8896ab"></span>Order Received</span>
+        <span class="nav-count" id="cnt-received">0</span>
+      </div>
+      <div class="nav-item" onclick="setFilter('scheduled',this)" data-filter="scheduled">
+        <span><span class="nav-dot" style="background:#7c5cbf"></span>Appt Scheduled</span>
+        <span class="nav-count" id="cnt-scheduled">0</span>
+      </div>
+      <div class="nav-item" onclick="setFilter('completed',this)" data-filter="completed">
+        <span><span class="nav-dot" style="background:#2ecc71"></span>Completed</span>
+        <span class="nav-count" id="cnt-completed">0</span>
+      </div>
+      <div class="nav-item" onclick="setFilter('incomplete',this)" data-filter="incomplete">
+        <span><span class="nav-dot" style="background:#f5a623"></span>Not Completed</span>
+        <span class="nav-count" id="cnt-incomplete">0</span>
+      </div>
+      <div class="nav-item" onclick="setFilter('unreachable',this)" data-filter="unreachable">
+        <span><span class="nav-dot" style="background:#e8453c"></span>Unable to Reach</span>
+        <span class="nav-count" id="cnt-unreachable">0</span>
+      </div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-label">GHL Integration</div>
+      <div class="nav-item" onclick="sendPrompt('Show me the GHL webhook setup instructions')">
+        &#128279; Setup Guide ↗
+      </div>
+      <div class="nav-item" onclick="testWebhook()">
+        &#9881; Inject Test Patient
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Content -->
+  <div class="main">
+    <div class="main-header">
+      <div class="search-wrap">
+        <span class="search-icon">&#128269;</span>
+        <input type="text" id="searchInput" placeholder="Search patient, provider..." oninput="renderAll()">
+      </div>
+      <select class="sort-select" id="sortSelect" onchange="renderAll()">
+        <option value="newest">Newest First</option>
+        <option value="oldest">Oldest First</option>
+        <option value="name">Name A–Z</option>
+        <option value="status">By Status</option>
+      </select>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-strip" id="statsStrip"></div>
+
+    <!-- Patient List -->
+    <div class="patient-grid" id="patientGrid"></div>
+  </div>
+</div>
+
+<!-- Add Patient Modal -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <h3>New Patient Order</h3>
+    <div class="form-grid">
+      <div class="form-row">
+        <div class="form-label">Patient Full Name *</div>
+        <input class="form-input" id="f-name" placeholder="First Last">
+      </div>
+      <div class="form-row">
+        <div class="form-label">Date of Birth</div>
+        <input class="form-input" type="date" id="f-dob">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-label">Ordering Provider / Clinic</div>
+      <input class="form-input" id="f-provider" placeholder="Dr. Name / Clinic">
+    </div>
+    <div class="form-row">
+      <div class="form-label">Test / Service Ordered</div>
+      <input class="form-input" id="f-service" placeholder="e.g. CBC, Lipid Panel, HbA1c">
+    </div>
+    <div class="form-grid">
+      <div class="form-row">
+        <div class="form-label">Phone</div>
+        <input class="form-input" id="f-phone" placeholder="(555) 000-0000">
+      </div>
+      <div class="form-row">
+        <div class="form-label">Email</div>
+        <input class="form-input" id="f-email" placeholder="patient@email.com">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-label">Order Received Date</div>
+      <input class="form-input" type="date" id="f-orderdate">
+    </div>
+    <div class="form-row">
+      <div class="form-label">Intake Notes</div>
+      <textarea class="form-input" id="f-notes" rows="2" placeholder="Fasting required, special instructions..."></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+      <button class="btn-submit" onclick="submitPatient()">Add Patient</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── Config ────────────────────────────────────────────────────────────────────
+// When deployed, this file is served from the same server.
+// Change BASE_URL only if hosting the UI separately from the API.
+const BASE_URL = window.location.origin;
+const POLL_INTERVAL = 30000; // 30 seconds
+
+// ── State ─────────────────────────────────────────────────────────────────────
+let patients = [];
+let currentFilter = 'all';
+let openCardId = null;
+
+// ── Avatar palette ────────────────────────────────────────────────────────────
+const PALETTES = [
+  ['#e0faf5','#009e82'],['#f3f0ff','#5a3eb5'],['#fff8eb','#b97c0a'],
+  ['#fef2f1','#c0392b'],['#e8f5e9','#2e7d32'],['#e3f2fd','#1565c0'],
+];
+function palette(id){const h=id?[...id].reduce((a,c)=>a+c.charCodeAt(0),0):0;return PALETTES[h%PALETTES.length]}
+function initials(n){return(n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()}
+
+// ── API calls ─────────────────────────────────────────────────────────────────
+async function fetchPatients(){
+  try{
+    const r=await fetch(`${BASE_URL}/api/patients`);
+    if(!r.ok)throw new Error();
+    patients=await r.json();
+    renderAll();
+  }catch(e){
+    // If server not reachable (preview mode), keep demo data
+    if(!patients.length) loadDemoData();
+  }
+}
+
+async function patchPatient(id,data){
+  try{
+    const r=await fetch(`${BASE_URL}/api/patients/${id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+    if(r.ok){const updated=await r.json();const i=patients.findIndex(p=>p.id===id);if(i>-1)patients[i]=updated;}
+  }catch(e){
+    // update local state anyway for offline resilience
+    const i=patients.findIndex(p=>p.id===id);if(i>-1)patients[i]={...patients[i],...data};
+  }
+}
+
+async function addPatient(data){
+  try{
+    const r=await fetch(`${BASE_URL}/api/patients`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+    if(r.ok){const p=await r.json();patients.unshift(p);return p;}
+  }catch(e){
+    const p={id:crypto.randomUUID(),source:'manual',receivedAt:new Date().toISOString(),orderDate:new Date().toISOString().slice(0,10),status:'received',...data};
+    patients.unshift(p);return p;
+  }
+}
+
+async function deletePatient(id){
+  try{await fetch(`${BASE_URL}/api/patients/${id}`,{method:'DELETE'});}catch(e){}
+  patients=patients.filter(p=>p.id!==id);
+  renderAll();
+}
+
+async function testWebhook(){
+  try{
+    await fetch(`${BASE_URL}/webhook/test`);
+    await fetchPatients();
+    toast('Test patient injected from GHL simulator');
+  }catch(e){
+    toast('Server not reachable — running in demo mode');
+  }
+}
+
+// ── Demo data for standalone preview ─────────────────────────────────────────
+function loadDemoData(){
+  patients=[
+    {id:'a1',source:'ghl_webhook',name:'Marcus Allen',dob:'1978-04-12',provider:'Dr. Kim / MGH',service:'CBC, CMP',phone:'617-555-0101',email:'m.allen@email.com',orderDate:'2026-03-28',status:'completed',apptDate:'2026-04-01',apptTime:'10:30',completedDate:'2026-04-01',completedTime:'10:47',incompleteReason:'',unreachableReason:'',notes:'3 tubes. Patient cooperative.'},
+    {id:'a2',source:'ghl_webhook',name:'Denise Crawford',dob:'1985-09-03',provider:'Dr. Patel / BMC',service:'HbA1c, Lipid Panel',phone:'617-555-0202',email:'d.crawford@email.com',orderDate:'2026-03-30',status:'scheduled',apptDate:'2026-04-05',apptTime:'09:00',completedDate:'',completedTime:'',incompleteReason:'',unreachableReason:'',notes:'Fasting required.'},
+    {id:'a3',source:'manual',name:'Jerome Washington',dob:'1962-11-20',provider:'Dr. Okafor / Howard U Health',service:'PSA, CBC',phone:'202-555-0303',email:'',orderDate:'2026-04-01',status:'received',apptDate:'',apptTime:'',completedDate:'',completedTime:'',incompleteReason:'',unreachableReason:'',notes:'Awaiting callback.'},
+    {id:'a4',source:'ghl_webhook',name:'Tanya Brooks',dob:'1991-06-15',provider:'Dr. Singh / Inova',service:'Thyroid Panel',phone:'703-555-0404',email:'t.brooks@email.com',orderDate:'2026-03-27',status:'incomplete',apptDate:'2026-03-31',apptTime:'14:00',completedDate:'',completedTime:'',incompleteReason:'Patient refused draw — anxious. Rescheduling.',unreachableReason:'',notes:''},
+    {id:'a5',source:'ghl_webhook',name:'Robert Nguyen',dob:'1970-02-28',provider:'Dr. Lee / UConn Health',service:'Comprehensive Metabolic',phone:'860-555-0505',email:'r.nguyen@email.com',orderDate:'2026-03-25',status:'unreachable',apptDate:'',apptTime:'',completedDate:'',completedTime:'',incompleteReason:'',unreachableReason:'3 call attempts. Voicemail full. Left message 3/28.',notes:''},
+  ];
+  renderAll();
+}
+
+// ── Render ────────────────────────────────────────────────────────────────────
+function getFiltered(){
+  const q=(document.getElementById('searchInput').value||'').toLowerCase();
+  const sort=document.getElementById('sortSelect').value;
+  let list=patients.filter(p=>{
+    if(currentFilter!=='all'&&p.status!==currentFilter)return false;
+    if(q&&![p.name,p.provider,p.service,p.phone||''].join(' ').toLowerCase().includes(q))return false;
+    return true;
+  });
+  const ORDER={received:0,scheduled:1,completed:2,incomplete:3,unreachable:4};
+  if(sort==='newest')list.sort((a,b)=>new Date(b.receivedAt||b.orderDate)-new Date(a.receivedAt||a.orderDate));
+  else if(sort==='oldest')list.sort((a,b)=>new Date(a.receivedAt||a.orderDate)-new Date(b.receivedAt||b.orderDate));
+  else if(sort==='name')list.sort((a,b)=>a.name.localeCompare(b.name));
+  else if(sort==='status')list.sort((a,b)=>(ORDER[a.status]||0)-(ORDER[b.status]||0));
+  return list;
+}
+
+function renderStats(){
+  const c={all:patients.length,received:0,scheduled:0,completed:0,incomplete:0,unreachable:0};
+  patients.forEach(p=>c[p.status]=(c[p.status]||0)+1);
+  ['all','received','scheduled','completed','incomplete','unreachable'].forEach(k=>{
+    const el=document.getElementById('cnt-'+k);if(el)el.textContent=c[k]||0;
+  });
+  const attn=(c.incomplete||0)+(c.unreachable||0);
+  document.getElementById('statsStrip').innerHTML=`
+    <div class="stat-card highlight"><div class="stat-label">Total Orders</div><div class="stat-val">${c.all}</div></div>
+    <div class="stat-card"><div class="stat-label">Scheduled</div><div class="stat-val">${c.scheduled}</div></div>
+    <div class="stat-card"><div class="stat-label">Completed</div><div class="stat-val">${c.completed}</div></div>
+    <div class="stat-card"><div class="stat-label">Needs Attention</div><div class="stat-val">${attn}</div></div>
+    <div class="stat-card"><div class="stat-label">Received Today</div><div class="stat-val">${patients.filter(p=>p.orderDate===new Date().toISOString().slice(0,10)).length}</div></div>
+  `;
+}
+
+const BADGE={received:'sb-received',scheduled:'sb-scheduled',completed:'sb-completed',incomplete:'sb-incomplete',unreachable:'sb-unreachable'};
+const BADGE_LABEL={received:'Order Received',scheduled:'Appt Scheduled',completed:'Completed',incomplete:'Not Completed',unreachable:'Unable to Reach'};
+
+function segClass(status,step){
+  const prog={received:1,scheduled:2,completed:3,incomplete:2,unreachable:1};
+  const steps={received:1,scheduled:2,completed:3};
+  const cur=prog[status]||1;
+  const sn=steps[step];
+  if(sn<cur)return 'done';
+  if(sn===cur){
+    if(status==='completed')return 'done';
+    if(status==='scheduled')return 'purple';
+    if(status==='incomplete')return 'warn';
+    if(status==='unreachable')return 'danger';
+    return 'done';
+  }
+  return '';
+}
+
+function renderCard(p){
+  const [bg,fg]=palette(p.id);
+  const isOpen=openCardId===p.id;
+  const segR=segClass(p.status,'received');
+  const segS=segClass(p.status,'scheduled');
+  const segC=segClass(p.status,'completed');
+  const stageLabel={received:'Waiting to schedule',scheduled:`Appt: ${p.apptDate||'TBD'}${p.apptTime?' @ '+p.apptTime:''}`,completed:`Done: ${p.completedDate||''}`,incomplete:'Not completed',unreachable:'Unable to reach'}[p.status]||'';
+  return `
+<div class="pcard${isOpen?' open':''}" id="pc-${p.id}" onclick="toggleCard('${p.id}')">
+  <div class="pcard-top">
+    <div class="avatar" style="background:${bg};color:${fg}">${initials(p.name)}</div>
+    <div class="pcard-info">
+      <div class="pcard-name">${p.name}</div>
+      <div class="pcard-meta">${p.service||'—'} &middot; ${p.provider||'—'}</div>
+    </div>
+    <div class="pcard-right">
+      <span class="source-tag${p.source==='ghl_webhook'?' ghl':''}">${p.source==='ghl_webhook'?'GHL':'Manual'}</span>
+      <span class="sbadge ${BADGE[p.status]||'sb-received'}">${BADGE_LABEL[p.status]||p.status}</span>
+      <span class="chevron">&#9660;</span>
+    </div>
+  </div>
+  <div class="journey-wrap">
+    <div class="j-seg ${segR}"></div>
+    <div class="j-seg ${segS}"></div>
+    <div class="j-seg ${segC}"></div>
+    <span class="j-label">${stageLabel}</span>
+  </div>
+  <div class="detail" id="det-${p.id}" onclick="event.stopPropagation()">
+    ${renderDetailHTML(p)}
+  </div>
+</div>`;
+}
+
+function renderDetailHTML(p){
+  const tlDot=(step)=>{
+    if(step==='received')return p.status?'done':'pending';
+    if(step==='scheduled')return p.apptDate?'done':p.status==='incomplete'?'warn':'pending';
+    if(step==='completed')return p.status==='completed'?'done':p.status==='incomplete'?'warn':'pending';
+    if(step==='unreachable')return p.status==='unreachable'?'danger':'pending';
+    return 'pending';
+  };
+  return `
+  <div class="detail-inner">
+    <div class="dsec">
+      <div class="dsec-title">Patient Info</div>
+      <div class="drow"><span class="drow-label">DOB</span><span class="drow-val">${p.dob||'—'}</span></div>
+      <div class="drow"><span class="drow-label">Phone</span><span class="drow-val">${p.phone||'—'}</span></div>
+      <div class="drow"><span class="drow-label">Email</span><span class="drow-val">${p.email||'—'}</span></div>
+      <div class="drow"><span class="drow-label">Provider</span><span class="drow-val">${p.provider||'—'}</span></div>
+      <div class="drow"><span class="drow-label">Order Date</span><span class="drow-val">${p.orderDate||'—'}</span></div>
+    </div>
+    <div class="dsec">
+      <div class="dsec-title">Journey Timeline</div>
+      <div class="timeline">
+        <div class="tl-row"><div class="tl-dot done">&#10003;</div><div class="tl-info"><div class="tl-name">Order Received</div><div class="tl-date">${p.orderDate||'—'}</div></div></div>
+        <div class="tl-row"><div class="tl-dot ${p.apptDate?'done':p.status==='incomplete'?'warn':'pending'}">${p.apptDate?'&#10003;':p.status==='incomplete'?'!':'&#9711;'}</div><div class="tl-info"><div class="tl-name">Appointment</div><div class="tl-date">${p.apptDate?p.apptDate+(p.apptTime?' @ '+p.apptTime:''):'Not scheduled'}</div></div></div>
+        <div class="tl-row"><div class="tl-dot ${p.status==='completed'?'done':p.status==='incomplete'?'warn':p.status==='unreachable'?'danger':'pending'}">${p.status==='completed'?'&#10003;':p.status==='incomplete'?'!':p.status==='unreachable'?'&#10007;':'&#9711;'}</div><div class="tl-info"><div class="tl-name">${p.status==='completed'?'Completed':p.status==='incomplete'?'Not Completed':p.status==='unreachable'?'Unable to Reach':'Pending'}</div><div class="tl-date">${p.status==='completed'&&p.completedDate?p.completedDate+(p.completedTime?' @ '+p.completedTime:''):p.incompleteReason||p.unreachableReason||'—'}</div></div></div>
+      </div>
+    </div>
+    <div class="dsec full">
+      <div class="dsec-title">Update Status</div>
+      <div class="update-row" id="urow-${p.id}">
+        ${buildUpdateRow(p)}
+      </div>
+    </div>
+    <div class="dsec full">
+      <div class="dsec-title">Notes</div>
+      <textarea class="notes-ta" id="nt-${p.id}" placeholder="Internal notes, instructions, follow-up...">${p.notes||''}</textarea>
+      <div class="save-notes-row"><button class="save-btn" onclick="saveNotes('${p.id}')">Save Notes</button></div>
+    </div>
+  </div>`;
+}
+
+function buildUpdateRow(p){
+  const s=p.status;
+  let extras='';
+  if(s==='scheduled')extras=`<input class="ctrl-input" type="date" id="ua-${p.id}" value="${p.apptDate}"><input class="ctrl-input" type="time" id="ub-${p.id}" value="${p.apptTime}">`;
+  if(s==='completed')extras=`<input class="ctrl-input" type="date" id="ua-${p.id}" value="${p.completedDate}"><input class="ctrl-input" type="time" id="ub-${p.id}" value="${p.completedTime}">`;
+  if(s==='incomplete')extras=`<input class="ctrl-input" id="ua-${p.id}" value="${p.incompleteReason||''}" placeholder="Reason not completed" style="flex:1;min-width:180px">`;
+  if(s==='unreachable')extras=`<input class="ctrl-input" id="ua-${p.id}" value="${p.unreachableReason||''}" placeholder="Reason unable to reach" style="flex:1;min-width:180px">`;
+  return `
+    <select class="ctrl-select" id="us-${p.id}" onchange="refreshUpdateRow('${p.id}')">
+      <option value="received" ${s==='received'?'selected':''}>Order Received</option>
+      <option value="scheduled" ${s==='scheduled'?'selected':''}>Appt Scheduled</option>
+      <option value="completed" ${s==='completed'?'selected':''}>Completed</option>
+      <option value="incomplete" ${s==='incomplete'?'selected':''}>Not Completed</option>
+      <option value="unreachable" ${s==='unreachable'?'selected':''}>Unable to Reach</option>
+    </select>
+    <div id="ue-${p.id}" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">${extras}</div>
+    <button class="save-btn" onclick="saveStatus('${p.id}')">Save</button>
+    <button class="del-btn" onclick="confirmDelete('${p.id}')">Remove</button>
+  `;
+}
+
+function refreshUpdateRow(id){
+  const sel=document.getElementById('us-'+id).value;
+  const p=patients.find(x=>x.id===id)||{};
+  const tmp={...p,status:sel};
+  let extras='';
+  if(sel==='scheduled')extras=`<input class="ctrl-input" type="date" id="ua-${id}" value="${p.apptDate||''}"><input class="ctrl-input" type="time" id="ub-${id}" value="${p.apptTime||''}">`;
+  if(sel==='completed')extras=`<input class="ctrl-input" type="date" id="ua-${id}" value="${p.completedDate||''}"><input class="ctrl-input" type="time" id="ub-${id}" value="${p.completedTime||''}">`;
+  if(sel==='incomplete')extras=`<input class="ctrl-input" id="ua-${id}" value="${p.incompleteReason||''}" placeholder="Reason not completed" style="flex:1;min-width:180px">`;
+  if(sel==='unreachable')extras=`<input class="ctrl-input" id="ua-${id}" value="${p.unreachableReason||''}" placeholder="Reason unable to reach" style="flex:1;min-width:180px">`;
+  document.getElementById('ue-'+id).innerHTML=extras;
+}
+
+function saveStatus(id){
+  const p=patients.find(x=>x.id===id);if(!p)return;
+  const s=document.getElementById('us-'+id)?.value||p.status;
+  const ua=document.getElementById('ua-'+id)?.value||'';
+  const ub=document.getElementById('ub-'+id)?.value||'';
+  const updates={status:s};
+  if(s==='scheduled'){updates.apptDate=ua;updates.apptTime=ub;}
+  if(s==='completed'){updates.completedDate=ua;updates.completedTime=ub;}
+  if(s==='incomplete'){updates.incompleteReason=ua;}
+  if(s==='unreachable'){updates.unreachableReason=ua;}
+  Object.assign(p,updates);
+  patchPatient(id,updates);
+  renderAll();openCardId=id;renderAll();
+  toast('Status updated');
+}
+
+function saveNotes(id){
+  const val=document.getElementById('nt-'+id)?.value||'';
+  const p=patients.find(x=>x.id===id);if(p)p.notes=val;
+  patchPatient(id,{notes:val});
+  toast('Notes saved');
+}
+
+function confirmDelete(id){
+  if(confirm('Remove this patient from the tracker?')){deletePatient(id);toast('Patient removed');}
+}
+
+function renderAll(){
+  renderStats();
+  const list=getFiltered();
+  const grid=document.getElementById('patientGrid');
+  if(!list.length){grid.innerHTML=`<div class="empty"><div class="empty-icon">&#128203;</div><div class="empty-title">No patients found</div><div>Adjust the filter or add a new patient order.</div></div>`;return;}
+  grid.innerHTML=list.map(renderCard).join('');
+}
+
+function toggleCard(id){
+  openCardId=openCardId===id?null:id;
+  renderAll();
+  if(openCardId){
+    const el=document.getElementById('pc-'+id);
+    if(el)setTimeout(()=>el.scrollIntoView({behavior:'smooth',block:'nearest'}),100);
+  }
+}
+
+function setFilter(f,el){
+  currentFilter=f;
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  if(el)el.classList.add('active');
+  renderAll();
+}
+
+// ── Modal ─────────────────────────────────────────────────────────────────────
+function openModal(){document.getElementById('modalOverlay').classList.add('open');}
+function closeModal(){document.getElementById('modalOverlay').classList.remove('open');}
+document.getElementById('modalOverlay').addEventListener('click',e=>{if(e.target===document.getElementById('modalOverlay'))closeModal();});
+
+async function submitPatient(){
+  const name=document.getElementById('f-name').value.trim();
+  if(!name){alert('Patient name is required.');return;}
+  const data={
+    name,dob:document.getElementById('f-dob').value,
+    provider:document.getElementById('f-provider').value,
+    service:document.getElementById('f-service').value,
+    phone:document.getElementById('f-phone').value,
+    email:document.getElementById('f-email').value,
+    orderDate:document.getElementById('f-orderdate').value||new Date().toISOString().slice(0,10),
+    notes:document.getElementById('f-notes').value,
+    status:'received',apptDate:'',apptTime:'',completedDate:'',completedTime:'',
+    incompleteReason:'',unreachableReason:'',source:'manual',
+    receivedAt:new Date().toISOString(),
+  };
+  await addPatient(data);
+  closeModal();renderAll();toast('Patient added');
+  ['f-name','f-dob','f-provider','f-service','f-phone','f-email','f-orderdate','f-notes'].forEach(id=>document.getElementById(id).value='');
+}
+
+// ── Toast ─────────────────────────────────────────────────────────────────────
+let toastTimer;
+function toast(msg){
+  const el=document.getElementById('toast');
+  el.textContent=msg;el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>el.classList.remove('show'),2800);
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+fetchPatients();
+setInterval(fetchPatients,POLL_INTERVAL);
+</script>
+</body>
+</html>
