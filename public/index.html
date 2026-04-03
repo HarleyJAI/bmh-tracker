@@ -8,12 +8,13 @@
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --navy:#0a1628;--navy-mid:#142240;--navy-light:#1e3a5f;
+  --navy:#0a1628;--navy-mid:#142240;
   --teal:#00c5a1;--teal-dim:#009e82;--teal-faint:#e0faf5;
   --amber:#f5a623;--amber-faint:#fff8eb;
   --red:#e8453c;--red-faint:#fef2f1;
   --green:#2ecc71;--green-faint:#edfbf3;
   --purple:#7c5cbf;--purple-faint:#f3f0ff;
+  --blue:#3b82f6;--blue-faint:#eff6ff;
   --slate:#8896ab;--slate-light:#c4cdd9;--border:#e4eaf2;
   --white:#ffffff;--surface:#f8fafc;--surface2:#f1f5f9;
   --text:#0d1b2e;--text-mid:#435166;--text-soft:#8896ab;
@@ -21,20 +22,24 @@
   --radius:10px;--radius-lg:14px;--radius-xl:20px;
 }
 body{font-family:var(--font);background:var(--surface);color:var(--text);min-height:100vh;font-size:14px}
+
+/* Topbar */
 .topbar{background:var(--navy);padding:14px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
 .topbar-brand{display:flex;align-items:center;gap:10px}
 .brand-mark{width:32px;height:32px;background:var(--teal);border-radius:8px;display:flex;align-items:center;justify-content:center}
 .brand-mark svg{width:18px;height:18px;fill:var(--navy)}
 .brand-name{color:var(--white);font-size:15px;font-weight:600;letter-spacing:-.02em}
 .brand-sub{color:var(--slate);font-size:11px;letter-spacing:.04em;text-transform:uppercase}
-.topbar-right{display:flex;align-items:center;gap:12px}
+.topbar-right{display:flex;align-items:center;gap:10px}
 .live-dot{width:8px;height:8px;border-radius:50%;background:var(--teal);animation:pulse 2s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
 .live-label{color:var(--slate);font-size:12px}
-.import-btn{background:transparent;color:var(--teal);border:1px solid var(--teal);border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font);transition:all .15s}
-.import-btn:hover{background:rgba(0,197,161,.1)}
-.add-btn{background:var(--teal);color:var(--navy);border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font);transition:background .15s}
-.add-btn:hover{background:var(--teal-dim)}
+.tab-btn{background:transparent;color:var(--slate);border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:7px 14px;font-size:13px;font-weight:500;cursor:pointer;font-family:var(--font);transition:all .15s}
+.tab-btn.active{background:var(--teal);color:var(--navy);border-color:var(--teal)}
+.import-btn{background:transparent;color:var(--teal);border:1px solid var(--teal);border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font)}
+.add-btn{background:var(--teal);color:var(--navy);border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font)}
+
+/* Layout */
 .layout{display:grid;grid-template-columns:220px 1fr;min-height:calc(100vh - 61px)}
 .sidebar{background:var(--white);border-right:1px solid var(--border);padding:20px 0}
 .sidebar-section{margin-bottom:24px}
@@ -45,23 +50,44 @@ body{font-family:var(--font);background:var(--surface);color:var(--text);min-hei
 .nav-count{background:var(--surface2);color:var(--text-soft);font-size:11px;font-weight:600;padding:2px 7px;border-radius:20px}
 .nav-item.active .nav-count{background:var(--teal);color:var(--navy)}
 .nav-dot{width:8px;height:8px;border-radius:50%;margin-right:8px;display:inline-block;flex-shrink:0}
+
+/* Main */
 .main{padding:24px;overflow-y:auto}
-.main-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;gap:12px;flex-wrap:wrap}
-.search-wrap{position:relative;flex:1;max-width:300px}
-.search-wrap input{width:100%;background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:9px 12px 9px 36px;font-size:13px;color:var(--text);font-family:var(--font);outline:none;transition:border .15s}
-.search-wrap input:focus{border-color:var(--teal)}
-.search-icon{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--slate);font-size:15px}
-.sort-select{background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:8px 12px;font-size:13px;color:var(--text-mid);font-family:var(--font);outline:none;cursor:pointer}
+.view{display:none}
+.view.active{display:block}
+
+/* Completion Rate Bar */
+.rate-bar-card{background:var(--white);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px 24px;margin-bottom:20px}
+.rate-bar-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.rate-bar-title{font-size:15px;font-weight:600;color:var(--text)}
+.rate-pct{font-size:28px;font-weight:600;color:var(--teal);letter-spacing:-.02em}
+.rate-bar-track{height:12px;background:var(--surface2);border-radius:8px;overflow:hidden;display:flex;margin-bottom:12px}
+.rate-seg{height:100%;transition:width .5s ease;min-width:0}
+.rate-legend{display:flex;flex-wrap:wrap;gap:12px}
+.rate-legend-item{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-mid)}
+.rate-legend-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.rate-legend-val{font-weight:600;color:var(--text)}
+
+/* Stats Strip */
 .stats-strip{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:20px}
-.stat-card{background:var(--white);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px 16px;transition:box-shadow .15s}
-.stat-card:hover{box-shadow:0 2px 12px rgba(0,0,0,.06)}
+.stat-card{background:var(--white);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px 16px}
 .stat-label{font-size:11px;color:var(--text-soft);margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em}
 .stat-val{font-size:26px;font-weight:600;color:var(--text);letter-spacing:-.02em}
 .stat-card.highlight{background:var(--navy);border-color:var(--navy)}
 .stat-card.highlight .stat-label{color:rgba(255,255,255,.5)}
 .stat-card.highlight .stat-val{color:var(--teal)}
+
+/* Search + sort */
+.main-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;gap:12px;flex-wrap:wrap}
+.search-wrap{position:relative;flex:1;max-width:300px}
+.search-wrap input{width:100%;background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:9px 12px 9px 36px;font-size:13px;color:var(--text);font-family:var(--font);outline:none}
+.search-wrap input:focus{border-color:var(--teal)}
+.search-icon{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--slate);font-size:15px}
+.sort-select{background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:8px 12px;font-size:13px;color:var(--text-mid);font-family:var(--font);outline:none;cursor:pointer}
+
+/* Patient cards */
 .patient-grid{display:flex;flex-direction:column;gap:10px}
-.pcard{background:var(--white);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;transition:box-shadow .15s,border-color .15s;cursor:pointer}
+.pcard{background:var(--white);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;cursor:pointer;transition:box-shadow .15s,border-color .15s}
 .pcard:hover{box-shadow:0 2px 16px rgba(0,0,0,.07);border-color:var(--slate-light)}
 .pcard.open{border-color:var(--teal);box-shadow:0 0 0 3px rgba(0,197,161,.08)}
 .pcard-top{display:flex;align-items:center;gap:14px;padding:16px 18px}
@@ -88,6 +114,8 @@ body{font-family:var(--font);background:var(--surface);color:var(--text);min-hei
 .sb-completed{background:var(--green-faint);color:#1a8a4a}
 .sb-incomplete{background:var(--amber-faint);color:#b97c0a}
 .sb-unreachable{background:var(--red-faint);color:var(--red)}
+
+/* Detail panel */
 .detail{display:none;padding:0 18px 18px;border-top:1px solid var(--border)}
 .pcard.open .detail{display:block}
 .detail-inner{padding-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:12px}
@@ -113,31 +141,73 @@ body{font-family:var(--font);background:var(--surface);color:var(--text);min-hei
 .ctrl-input{background:var(--white);border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:12px;color:var(--text);font-family:var(--font);outline:none}
 .ctrl-input:focus,.ctrl-select:focus{border-color:var(--teal)}
 .save-btn{background:var(--teal);color:var(--navy);border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:var(--font)}
-.save-btn:hover{background:var(--teal-dim)}
 .del-btn{background:transparent;border:1px solid var(--red-faint);color:var(--red);border-radius:8px;padding:7px 12px;font-size:12px;cursor:pointer;font-family:var(--font);margin-left:auto}
 .notes-ta{width:100%;background:var(--white);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;color:var(--text);font-family:var(--font);resize:vertical;min-height:64px;outline:none}
-.notes-ta:focus{border-color:var(--teal)}
 .save-notes-row{display:flex;justify-content:flex-end;margin-top:6px}
+
+/* ── METRICS VIEW ── */
+.metrics-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px}
+.metrics-card{background:var(--white);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px}
+.metrics-card.full{grid-column:1/-1}
+.metrics-title{font-size:13px;font-weight:600;color:var(--text);margin-bottom:16px;display:flex;align-items:center;gap:8px}
+.metrics-title-icon{width:24px;height:24px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:13px}
+
+/* Leaderboard */
+.lb-row{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)}
+.lb-row:last-child{border-bottom:none}
+.lb-rank{font-size:13px;font-weight:700;color:var(--text-soft);width:24px;text-align:center;flex-shrink:0}
+.lb-rank.gold{color:#f59e0b}
+.lb-rank.silver{color:#94a3b8}
+.lb-rank.bronze{color:#b45309}
+.lb-avatar{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;flex-shrink:0}
+.lb-info{flex:1;min-width:0}
+.lb-name{font-size:13px;font-weight:600;color:var(--text)}
+.lb-bar-wrap{margin-top:4px;display:flex;align-items:center;gap:8px}
+.lb-bar-track{flex:1;height:6px;background:var(--surface2);border-radius:4px;overflow:hidden}
+.lb-bar-fill{height:100%;border-radius:4px;background:var(--teal);transition:width .5s ease}
+.lb-stats{display:flex;gap:10px;flex-shrink:0}
+.lb-stat{text-align:center}
+.lb-stat-val{font-size:14px;font-weight:700;color:var(--text)}
+.lb-stat-label{font-size:10px;color:var(--text-soft);text-transform:uppercase;letter-spacing:.04em}
+
+/* Donut chart area */
+.donut-wrap{display:flex;align-items:center;gap:24px}
+.donut-svg{flex-shrink:0}
+.donut-legend{flex:1}
+.donut-legend-row{display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);font-size:13px}
+.donut-legend-row:last-child{border-bottom:none}
+.donut-legend-left{display:flex;align-items:center;gap:8px}
+.donut-legend-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.donut-legend-pct{font-weight:600;color:var(--text)}
+
+/* Mini stat pills */
+.mini-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
+.mini-stat{background:var(--surface);border-radius:var(--radius);padding:12px;text-align:center}
+.mini-stat-val{font-size:22px;font-weight:700;color:var(--text)}
+.mini-stat-label{font-size:11px;color:var(--text-soft);text-transform:uppercase;letter-spacing:.04em;margin-top:2px}
+
+/* Provider filter pill */
+.provider-pills{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}
+.provider-pill{padding:5px 12px;border-radius:20px;font-size:12px;font-weight:500;cursor:pointer;border:1px solid var(--border);background:var(--surface);color:var(--text-mid);transition:all .15s}
+.provider-pill.active{background:var(--navy);color:var(--white);border-color:var(--navy)}
+
+/* Modal */
 .modal-overlay{position:fixed;inset:0;background:rgba(10,22,40,.55);display:none;align-items:center;justify-content:center;z-index:200;padding:20px}
 .modal-overlay.open{display:flex}
 .modal{background:var(--white);border-radius:var(--radius-xl);padding:28px;width:100%;max-width:500px;max-height:90vh;overflow-y:auto}
 .modal h3{font-size:18px;font-weight:600;color:var(--text);margin-bottom:20px}
 .form-row{margin-bottom:14px}
 .form-label{font-size:12px;font-weight:500;color:var(--text-mid);margin-bottom:5px}
-.form-input{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;color:var(--text);font-family:var(--font);outline:none;transition:border .15s}
+.form-input{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;color:var(--text);font-family:var(--font);outline:none}
 .form-input:focus{border-color:var(--teal);background:var(--white)}
 .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:20px}
 .btn-cancel{background:transparent;border:1px solid var(--border);border-radius:8px;padding:9px 18px;font-size:13px;cursor:pointer;color:var(--text-mid);font-family:var(--font)}
 .btn-submit{background:var(--teal);color:var(--navy);border:none;border-radius:8px;padding:9px 20px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font)}
-.empty{text-align:center;padding:48px 20px;color:var(--text-soft)}
-.empty-icon{font-size:36px;margin-bottom:12px}
-.empty-title{font-size:15px;font-weight:500;color:var(--text-mid);margin-bottom:6px}
-.toast{position:fixed;bottom:24px;right:24px;background:var(--navy);color:var(--white);padding:12px 18px;border-radius:10px;font-size:13px;font-weight:500;transform:translateY(80px);opacity:0;transition:all .3s;z-index:500;border-left:3px solid var(--teal)}
-.toast.show{transform:translateY(0);opacity:1}
-/* Import Modal */
+
+/* Import modal */
 .import-tabs{display:flex;gap:0;margin-bottom:20px;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
-.import-tab{flex:1;padding:9px;font-size:13px;font-weight:500;text-align:center;cursor:pointer;background:var(--surface);color:var(--text-soft);border:none;font-family:var(--font);transition:all .15s}
+.import-tab{flex:1;padding:9px;font-size:13px;font-weight:500;text-align:center;cursor:pointer;background:var(--surface);color:var(--text-soft);border:none;font-family:var(--font)}
 .import-tab.active{background:var(--navy);color:var(--white)}
 .drop-zone{border:2px dashed var(--border);border-radius:var(--radius-lg);padding:36px 20px;text-align:center;cursor:pointer;transition:all .2s;background:var(--surface)}
 .drop-zone.dragover{border-color:var(--teal);background:var(--teal-faint)}
@@ -147,21 +217,25 @@ body{font-family:var(--font);background:var(--surface);color:var(--text);min-hei
 .drop-zone-sub{font-size:12px;color:var(--text-soft)}
 .csv-template{font-size:12px;color:var(--teal-dim);cursor:pointer;text-decoration:underline;margin-top:10px;display:inline-block}
 .paste-ta{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;font-size:12px;color:var(--text);font-family:var(--mono);resize:vertical;min-height:140px;outline:none;line-height:1.6}
-.paste-ta:focus{border-color:var(--teal)}
 .import-preview{margin-top:16px;display:none}
 .import-preview-title{font-size:12px;font-weight:600;color:var(--text-soft);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px}
 .preview-table{width:100%;border-collapse:collapse;font-size:12px}
 .preview-table th{background:var(--surface2);padding:6px 10px;text-align:left;color:var(--text-soft);font-weight:600;border-bottom:1px solid var(--border)}
 .preview-table td{padding:6px 10px;border-bottom:1px solid var(--border);color:var(--text);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.preview-table tr:last-child td{border-bottom:none}
-.import-summary{display:flex;gap:10px;margin-top:10px;flex-wrap:wrap}
-.imp-stat{background:var(--surface2);border-radius:var(--radius);padding:6px 12px;font-size:12px;color:var(--text-mid)}
+.imp-stat{background:var(--surface2);border-radius:var(--radius);padding:6px 12px;font-size:12px;color:var(--text-mid);display:inline-block;margin-top:8px}
 .imp-stat span{font-weight:600;color:var(--text)}
+
+/* Empty + Toast */
+.empty{text-align:center;padding:48px 20px;color:var(--text-soft)}
+.empty-icon{font-size:36px;margin-bottom:12px}
+.empty-title{font-size:15px;font-weight:500;color:var(--text-mid);margin-bottom:6px}
+.toast{position:fixed;bottom:24px;right:24px;background:var(--navy);color:var(--white);padding:12px 18px;border-radius:10px;font-size:13px;font-weight:500;transform:translateY(80px);opacity:0;transition:all .3s;z-index:500;border-left:3px solid var(--teal)}
+.toast.show{transform:translateY(0);opacity:1}
+
 @media(max-width:700px){
-  .layout{grid-template-columns:1fr}
-  .sidebar{display:none}
+  .layout{grid-template-columns:1fr}.sidebar{display:none}
   .stats-strip{grid-template-columns:repeat(2,1fr)}
-  .detail-inner{grid-template-columns:1fr}
+  .detail-inner,.metrics-grid{grid-template-columns:1fr}
   .form-grid{grid-template-columns:1fr}
 }
 </style>
@@ -170,18 +244,14 @@ body{font-family:var(--font);background:var(--surface);color:var(--text);min-hei
 
 <div class="topbar">
   <div class="topbar-brand">
-    <div class="brand-mark">
-      <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/></svg>
-    </div>
-    <div>
-      <div class="brand-name">BMH Patient Tracker</div>
-      <div class="brand-sub">Beyond Mobile Health</div>
-    </div>
+    <div class="brand-mark"><svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/></svg></div>
+    <div><div class="brand-name">BMH Patient Tracker</div><div class="brand-sub">Beyond Mobile Health</div></div>
   </div>
   <div class="topbar-right">
-    <div class="live-dot"></div>
-    <span class="live-label">Live sync</span>
-    <button class="import-btn" onclick="openImportModal()">&#8593; Bulk Import</button>
+    <div class="live-dot"></div><span class="live-label">Live</span>
+    <button class="tab-btn active" onclick="switchView('tracker',this)">Tracker</button>
+    <button class="tab-btn" onclick="switchView('metrics',this)">Metrics</button>
+    <button class="import-btn" onclick="openImportModal()">&#8593; Import</button>
     <button class="add-btn" onclick="openModal()">+ Add Patient</button>
   </div>
 </div>
@@ -190,53 +260,85 @@ body{font-family:var(--font);background:var(--surface);color:var(--text);min-hei
   <div class="sidebar">
     <div class="sidebar-section">
       <div class="sidebar-label">Filter by Status</div>
-      <div class="nav-item active" onclick="setFilter('all',this)">
-        <span><span class="nav-dot" style="background:#8896ab"></span>All Patients</span>
-        <span class="nav-count" id="cnt-all">0</span>
-      </div>
-      <div class="nav-item" onclick="setFilter('received',this)">
-        <span><span class="nav-dot" style="background:#8896ab"></span>Order Received</span>
-        <span class="nav-count" id="cnt-received">0</span>
-      </div>
-      <div class="nav-item" onclick="setFilter('scheduled',this)">
-        <span><span class="nav-dot" style="background:#7c5cbf"></span>Appt Scheduled</span>
-        <span class="nav-count" id="cnt-scheduled">0</span>
-      </div>
-      <div class="nav-item" onclick="setFilter('completed',this)">
-        <span><span class="nav-dot" style="background:#2ecc71"></span>Completed</span>
-        <span class="nav-count" id="cnt-completed">0</span>
-      </div>
-      <div class="nav-item" onclick="setFilter('incomplete',this)">
-        <span><span class="nav-dot" style="background:#f5a623"></span>Not Completed</span>
-        <span class="nav-count" id="cnt-incomplete">0</span>
-      </div>
-      <div class="nav-item" onclick="setFilter('unreachable',this)">
-        <span><span class="nav-dot" style="background:#e8453c"></span>Unable to Reach</span>
-        <span class="nav-count" id="cnt-unreachable">0</span>
-      </div>
+      <div class="nav-item active" onclick="setFilter('all',this)"><span><span class="nav-dot" style="background:#8896ab"></span>All Patients</span><span class="nav-count" id="cnt-all">0</span></div>
+      <div class="nav-item" onclick="setFilter('received',this)"><span><span class="nav-dot" style="background:#8896ab"></span>Order Received</span><span class="nav-count" id="cnt-received">0</span></div>
+      <div class="nav-item" onclick="setFilter('scheduled',this)"><span><span class="nav-dot" style="background:#7c5cbf"></span>Appt Scheduled</span><span class="nav-count" id="cnt-scheduled">0</span></div>
+      <div class="nav-item" onclick="setFilter('completed',this)"><span><span class="nav-dot" style="background:#2ecc71"></span>Completed</span><span class="nav-count" id="cnt-completed">0</span></div>
+      <div class="nav-item" onclick="setFilter('incomplete',this)"><span><span class="nav-dot" style="background:#f5a623"></span>Not Completed</span><span class="nav-count" id="cnt-incomplete">0</span></div>
+      <div class="nav-item" onclick="setFilter('unreachable',this)"><span><span class="nav-dot" style="background:#e8453c"></span>Unable to Reach</span><span class="nav-count" id="cnt-unreachable">0</span></div>
     </div>
     <div class="sidebar-section">
-      <div class="sidebar-label">GHL Integration</div>
+      <div class="sidebar-label">Tools</div>
+      <div class="nav-item" onclick="switchView('metrics',document.querySelectorAll('.tab-btn')[1])">&#128202; Metrics &amp; Leaderboard</div>
       <div class="nav-item" onclick="openImportModal()">&#8593; Bulk Import</div>
       <div class="nav-item" onclick="testWebhook()">&#9881; Inject Test Patient</div>
     </div>
   </div>
 
   <div class="main">
-    <div class="main-header">
-      <div class="search-wrap">
-        <span class="search-icon">&#128269;</span>
-        <input type="text" id="searchInput" placeholder="Search patient, provider..." oninput="renderAll()">
+
+    <!-- TRACKER VIEW -->
+    <div class="view active" id="view-tracker">
+      <!-- Completion Rate Bar -->
+      <div class="rate-bar-card">
+        <div class="rate-bar-header">
+          <div class="rate-bar-title">Overall Completion Rate</div>
+          <div class="rate-pct" id="completionPct">0%</div>
+        </div>
+        <div class="rate-bar-track" id="rateBarTrack"></div>
+        <div class="rate-legend" id="rateLegend"></div>
       </div>
-      <select class="sort-select" id="sortSelect" onchange="renderAll()">
-        <option value="newest">Newest First</option>
-        <option value="oldest">Oldest First</option>
-        <option value="name">Name A-Z</option>
-        <option value="status">By Status</option>
-      </select>
+
+      <div class="stats-strip" id="statsStrip"></div>
+
+      <div class="main-header">
+        <div class="search-wrap">
+          <span class="search-icon">&#128269;</span>
+          <input type="text" id="searchInput" placeholder="Search patient, provider..." oninput="renderAll()">
+        </div>
+        <select class="sort-select" id="sortSelect" onchange="renderAll()">
+          <option value="newest">Newest First</option>
+          <option value="oldest">Oldest First</option>
+          <option value="name">Name A-Z</option>
+          <option value="status">By Status</option>
+        </select>
+      </div>
+      <div class="patient-grid" id="patientGrid"></div>
     </div>
-    <div class="stats-strip" id="statsStrip"></div>
-    <div class="patient-grid" id="patientGrid"></div>
+
+    <!-- METRICS VIEW -->
+    <div class="view" id="view-metrics">
+      <div class="mini-stats" id="miniStats"></div>
+
+      <div class="metrics-grid">
+        <!-- Leaderboard -->
+        <div class="metrics-card full">
+          <div class="metrics-title"><div class="metrics-title-icon" style="background:#e0faf5">&#127942;</div>Provider Leaderboard — Patients Seen</div>
+          <div class="provider-pills" id="providerPills"></div>
+          <div id="leaderboard"></div>
+        </div>
+
+        <!-- Status Breakdown -->
+        <div class="metrics-card">
+          <div class="metrics-title"><div class="metrics-title-icon" style="background:#f3f0ff">&#128200;</div>Status Breakdown</div>
+          <div class="donut-wrap">
+            <svg class="donut-svg" width="120" height="120" viewBox="0 0 120 120" id="donutSvg"></svg>
+            <div class="donut-legend" id="donutLegend"></div>
+          </div>
+        </div>
+
+        <!-- Completion Rate -->
+        <div class="metrics-card">
+          <div class="metrics-title"><div class="metrics-title-icon" style="background:#e0faf5">&#9989;</div>Completion Rate</div>
+          <div style="text-align:center;padding:16px 0">
+            <div style="font-size:52px;font-weight:700;color:var(--teal)" id="bigPct">0%</div>
+            <div style="font-size:13px;color:var(--text-soft);margin-top:4px" id="bigPctSub">of total orders completed</div>
+          </div>
+          <div class="rate-bar-track" id="metricsRateBar" style="height:16px;border-radius:8px"></div>
+        </div>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -245,41 +347,18 @@ body{font-family:var(--font);background:var(--surface);color:var(--text);min-hei
   <div class="modal">
     <h3>New Patient Order</h3>
     <div class="form-grid">
-      <div class="form-row">
-        <div class="form-label">Patient Full Name *</div>
-        <input class="form-input" id="f-name" placeholder="First Last">
-      </div>
-      <div class="form-row">
-        <div class="form-label">Date of Birth</div>
-        <input class="form-input" type="date" id="f-dob">
-      </div>
+      <div class="form-row"><div class="form-label">Patient Full Name *</div><input class="form-input" id="f-name" placeholder="First Last"></div>
+      <div class="form-row"><div class="form-label">Date of Birth</div><input class="form-input" type="date" id="f-dob"></div>
     </div>
-    <div class="form-row">
-      <div class="form-label">Ordering Provider / Clinic</div>
-      <input class="form-input" id="f-provider" placeholder="Dr. Name / Clinic">
-    </div>
-    <div class="form-row">
-      <div class="form-label">Test / Service Ordered</div>
-      <input class="form-input" id="f-service" placeholder="e.g. CBC, Lipid Panel, HbA1c">
-    </div>
+    <div class="form-row"><div class="form-label">Ordering Provider / Clinic</div><input class="form-input" id="f-provider" placeholder="Dr. Name / Clinic"></div>
+    <div class="form-row"><div class="form-label">Test / Service Ordered</div><input class="form-input" id="f-service" placeholder="e.g. CBC, Lipid Panel"></div>
     <div class="form-grid">
-      <div class="form-row">
-        <div class="form-label">Phone</div>
-        <input class="form-input" id="f-phone" placeholder="(555) 000-0000">
-      </div>
-      <div class="form-row">
-        <div class="form-label">Email</div>
-        <input class="form-input" id="f-email" placeholder="patient@email.com">
-      </div>
+      <div class="form-row"><div class="form-label">Phone</div><input class="form-input" id="f-phone" placeholder="(555) 000-0000"></div>
+      <div class="form-row"><div class="form-label">Email</div><input class="form-input" id="f-email" placeholder="patient@email.com"></div>
     </div>
-    <div class="form-row">
-      <div class="form-label">Order Received Date</div>
-      <input class="form-input" type="date" id="f-orderdate">
-    </div>
-    <div class="form-row">
-      <div class="form-label">Intake Notes</div>
-      <textarea class="form-input" id="f-notes" rows="2" placeholder="Fasting required, special instructions..."></textarea>
-    </div>
+    <div class="form-row"><div class="form-label">Assigned To (Phlebotomist)</div><input class="form-input" id="f-assignee" placeholder="e.g. Dara Chase"></div>
+    <div class="form-row"><div class="form-label">Order Received Date</div><input class="form-input" type="date" id="f-orderdate"></div>
+    <div class="form-row"><div class="form-label">Intake Notes</div><textarea class="form-input" id="f-notes" rows="2" placeholder="Fasting required, special instructions..."></textarea></div>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeModal()">Cancel</button>
       <button class="btn-submit" onclick="submitPatient()">Add Patient</button>
@@ -287,7 +366,7 @@ body{font-family:var(--font);background:var(--surface);color:var(--text);min-hei
   </div>
 </div>
 
-<!-- Bulk Import Modal -->
+<!-- Import Modal -->
 <div class="modal-overlay" id="importOverlay">
   <div class="modal" style="max-width:600px">
     <h3>Bulk Import Patients</h3>
@@ -302,24 +381,17 @@ body{font-family:var(--font);background:var(--surface);color:var(--text);min-hei
         <div class="drop-zone-sub" id="dropSub">or click to browse</div>
       </div>
       <input type="file" id="csvFileInput" accept=".csv" style="display:none" onchange="handleFileSelect(event)">
-      <div style="text-align:center;margin-top:10px">
-        <span class="csv-template" onclick="downloadTemplate()">Download CSV template</span>
-      </div>
-      <div style="margin-top:12px;padding:10px 12px;background:var(--surface2);border-radius:var(--radius);font-size:12px;color:var(--text-soft)">
-        Accepted columns: <strong>name, dob, provider, service, phone, email, notes</strong>. Header row is optional.
-      </div>
+      <div style="text-align:center;margin-top:10px"><span class="csv-template" onclick="downloadTemplate()">Download CSV template</span></div>
+      <div style="margin-top:12px;padding:10px 12px;background:var(--surface2);border-radius:var(--radius);font-size:12px;color:var(--text-soft)">Accepted columns: <strong>name, dob, provider, service, phone, email, assignee, notes, status, apptDate, apptTime, completedDate, completedTime</strong></div>
     </div>
     <div id="tab-paste" style="display:none">
       <div class="form-label" style="margin-bottom:6px">Paste rows directly from Excel or Google Sheets</div>
-      <textarea class="paste-ta" id="pasteInput" placeholder="name, dob, provider, service, phone, email, notes&#10;John Smith, 1980-01-15, Dr. Lee / BMC, CBC, 617-555-0101, j.smith@email.com&#10;Jane Doe, 1975-06-20, Dr. Patel / MGH, Lipid Panel..." oninput="parsePaste()"></textarea>
-      <div style="font-size:11px;color:var(--text-soft);margin-top:6px">Works with tab-separated (copy from Excel/Sheets) or comma-separated. First row header is auto-detected.</div>
+      <textarea class="paste-ta" id="pasteInput" placeholder="name, dob, provider, service, phone, email, assignee&#10;John Smith, 1980-01-15, Dr. Lee / BMC, CBC, 617-555-0101..." oninput="parsePaste()"></textarea>
     </div>
     <div class="import-preview" id="importPreview">
       <div class="import-preview-title">Preview</div>
-      <div style="overflow-x:auto;border-radius:var(--radius);border:1px solid var(--border)">
-        <table class="preview-table" id="previewTable"></table>
-      </div>
-      <div class="import-summary" id="importSummary"></div>
+      <div style="overflow-x:auto;border-radius:var(--radius);border:1px solid var(--border)"><table class="preview-table" id="previewTable"></table></div>
+      <div id="importSummary"></div>
     </div>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeImportModal()">Cancel</button>
@@ -337,70 +409,86 @@ let patients = [];
 let currentFilter = 'all';
 let openCardId = null;
 let importRows = [];
+let currentView = 'tracker';
+let selectedProvider = 'all';
 
-const PALETTES = [
-  ['#e0faf5','#009e82'],['#f3f0ff','#5a3eb5'],['#fff8eb','#b97c0a'],
-  ['#fef2f1','#c0392b'],['#e8f5e9','#2e7d32'],['#e3f2fd','#1565c0'],
-];
+const PALETTES=[['#e0faf5','#009e82'],['#f3f0ff','#5a3eb5'],['#fff8eb','#b97c0a'],['#fef2f1','#c0392b'],['#e8f5e9','#2e7d32'],['#e3f2fd','#1565c0'],['#fce7f3','#9d174d'],['#fff7ed','#c2410c']];
+const PROVIDER_COLORS=['#00c5a1','#7c5cbf','#f5a623','#3b82f6','#e8453c','#2ecc71','#e879f9','#f97316'];
 function palette(id){const h=id?[...id].reduce((a,c)=>a+c.charCodeAt(0),0):0;return PALETTES[h%PALETTES.length]}
 function initials(n){return(n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()}
+function providerColor(name){const h=[...name].reduce((a,c)=>a+c.charCodeAt(0),0);return PROVIDER_COLORS[h%PROVIDER_COLORS.length]}
 
-async function fetchPatients(){
-  try{
-    const r=await fetch(BASE_URL+'/api/patients');
-    if(!r.ok)throw new Error();
-    patients=await r.json();renderAll();
-  }catch(e){if(!patients.length)loadDemoData();}
+// Extract assignee from notes field if not set directly
+function getAssignee(p){
+  if(p.assignee&&p.assignee.trim())return p.assignee.trim();
+  if(p.notes){const m=p.notes.match(/Assigned to:\s*([^|]+)/i);if(m)return m[1].trim();}
+  return '';
 }
 
+// ── API ──────────────────────────────────────────────────────────────────────
+async function fetchPatients(){
+  try{const r=await fetch(BASE_URL+'/api/patients');if(!r.ok)throw new Error();patients=await r.json();renderAll();renderMetrics();}
+  catch(e){if(!patients.length)loadDemoData();}
+}
 async function patchPatient(id,data){
   try{await fetch(BASE_URL+'/api/patients/'+id,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});}catch(e){}
   const i=patients.findIndex(p=>p.id===id);if(i>-1)patients[i]={...patients[i],...data};
 }
-
 async function addPatient(data){
-  try{
-    const r=await fetch(BASE_URL+'/api/patients',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
-    if(r.ok){const p=await r.json();patients.unshift(p);return p;}
-  }catch(e){}
+  try{const r=await fetch(BASE_URL+'/api/patients',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});if(r.ok){const p=await r.json();patients.unshift(p);return p;}}catch(e){}
   const p={id:crypto.randomUUID(),source:'manual',receivedAt:new Date().toISOString(),orderDate:new Date().toISOString().slice(0,10),status:'received',...data};
   patients.unshift(p);return p;
 }
-
 async function deletePatient(id){
   try{await fetch(BASE_URL+'/api/patients/'+id,{method:'DELETE'});}catch(e){}
-  patients=patients.filter(p=>p.id!==id);renderAll();
+  patients=patients.filter(p=>p.id!==id);renderAll();renderMetrics();
 }
-
 async function testWebhook(){
-  try{await fetch(BASE_URL+'/webhook/test');await fetchPatients();toast('Test patient injected');}
-  catch(e){toast('Server not reachable');}
+  try{await fetch(BASE_URL+'/webhook/test');await fetchPatients();toast('Test patient injected');}catch(e){toast('Server not reachable');}
 }
 
 function loadDemoData(){
   patients=[
-    {id:'a1',source:'ghl_webhook',name:'Marcus Allen',dob:'1978-04-12',provider:'Dr. Kim / MGH',service:'CBC, CMP',phone:'617-555-0101',email:'m.allen@email.com',orderDate:'2026-03-28',status:'completed',apptDate:'2026-04-01',apptTime:'10:30',completedDate:'2026-04-01',completedTime:'10:47',incompleteReason:'',unreachableReason:'',notes:'3 tubes. Patient cooperative.'},
-    {id:'a2',source:'ghl_webhook',name:'Denise Crawford',dob:'1985-09-03',provider:'Dr. Patel / BMC',service:'HbA1c, Lipid Panel',phone:'617-555-0202',email:'d.crawford@email.com',orderDate:'2026-03-30',status:'scheduled',apptDate:'2026-04-05',apptTime:'09:00',completedDate:'',completedTime:'',incompleteReason:'',unreachableReason:'',notes:'Fasting required.'},
-    {id:'a3',source:'manual',name:'Jerome Washington',dob:'1962-11-20',provider:'Dr. Okafor / Howard U',service:'PSA, CBC',phone:'202-555-0303',email:'',orderDate:'2026-04-01',status:'received',apptDate:'',apptTime:'',completedDate:'',completedTime:'',incompleteReason:'',unreachableReason:'',notes:''},
+    {id:'a1',source:'ghl_webhook',name:'Marcus Allen',dob:'1978-04-12',provider:'Dr. Kim / MGH',service:'CBC, CMP',phone:'617-555-0101',email:'m.allen@email.com',orderDate:'2026-03-28',status:'completed',apptDate:'2026-04-01',apptTime:'10:30',completedDate:'2026-04-01',completedTime:'10:47',assignee:'Dara Chase',incompleteReason:'',unreachableReason:'',notes:'3 tubes.'},
+    {id:'a2',source:'ghl_webhook',name:'Denise Crawford',dob:'1985-09-03',provider:'Dr. Patel / BMC',service:'HbA1c',phone:'617-555-0202',email:'',orderDate:'2026-03-30',status:'scheduled',apptDate:'2026-04-05',apptTime:'09:00',completedDate:'',completedTime:'',assignee:'Chermaine Morson',incompleteReason:'',unreachableReason:'',notes:'Fasting required.'},
+    {id:'a3',source:'manual',name:'Jerome Washington',dob:'1962-11-20',provider:'Dr. Okafor',service:'PSA',phone:'202-555-0303',email:'',orderDate:'2026-04-01',status:'received',apptDate:'',apptTime:'',completedDate:'',completedTime:'',assignee:'Shari Bagnor',incompleteReason:'',unreachableReason:'',notes:''},
+    {id:'a4',source:'ghl_webhook',name:'Tanya Brooks',dob:'1991-06-15',provider:'Dr. Singh / Inova',service:'Thyroid',phone:'703-555-0404',email:'',orderDate:'2026-03-27',status:'incomplete',apptDate:'2026-03-31',apptTime:'14:00',completedDate:'',completedTime:'',assignee:'Dara Chase',incompleteReason:'Patient refused draw.',unreachableReason:'',notes:''},
+    {id:'a5',source:'ghl_webhook',name:'Robert Nguyen',dob:'1970-02-28',provider:'Dr. Lee / UConn',service:'CMP',phone:'860-555-0505',email:'',orderDate:'2026-03-25',status:'unreachable',apptDate:'',apptTime:'',completedDate:'',completedTime:'',assignee:'Shari Bagnor',incompleteReason:'',unreachableReason:'3 call attempts.',notes:''},
+    {id:'a6',source:'csv',name:'Pearl Garcia',dob:'1932-01-16',provider:'BMC',service:'CBC',phone:'617-555-0606',email:'',orderDate:'2026-03-19',status:'completed',apptDate:'2026-03-25',apptTime:'10:00',completedDate:'2026-03-25',completedTime:'10:20',assignee:'Chermaine Morson',incompleteReason:'',unreachableReason:'',notes:''},
   ];
-  renderAll();
+  renderAll();renderMetrics();
 }
 
-function getFiltered(){
-  const q=(document.getElementById('searchInput').value||'').toLowerCase();
-  const sort=document.getElementById('sortSelect').value;
-  let list=patients.filter(p=>{
-    if(currentFilter!=='all'&&p.status!==currentFilter)return false;
-    if(q&&![p.name,p.provider||'',p.service||'',p.phone||''].join(' ').toLowerCase().includes(q))return false;
-    return true;
-  });
-  if(sort==='newest')list.sort((a,b)=>new Date(b.receivedAt||b.orderDate)-new Date(a.receivedAt||a.orderDate));
-  else if(sort==='oldest')list.sort((a,b)=>new Date(a.receivedAt||a.orderDate)-new Date(b.receivedAt||b.orderDate));
-  else if(sort==='name')list.sort((a,b)=>a.name.localeCompare(b.name));
-  else if(sort==='status'){const O={received:0,scheduled:1,completed:2,incomplete:3,unreachable:4};list.sort((a,b)=>(O[a.status]||0)-(O[b.status]||0));}
-  return list;
+// ── View switching ────────────────────────────────────────────────────────────
+function switchView(view, btn){
+  currentView=view;
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.getElementById('view-'+view).classList.add('active');
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  if(btn)btn.classList.add('active');
+  if(view==='metrics')renderMetrics();
 }
 
+// ── Completion Rate Bar ───────────────────────────────────────────────────────
+function renderRateBar(){
+  const total=patients.length;
+  if(!total){document.getElementById('completionPct').textContent='0%';document.getElementById('rateBarTrack').innerHTML='';document.getElementById('rateLegend').innerHTML='';return;}
+  const c={completed:0,scheduled:0,received:0,incomplete:0,unreachable:0};
+  patients.forEach(p=>c[p.status]=(c[p.status]||0)+1);
+  const pct=Math.round((c.completed/total)*100);
+  document.getElementById('completionPct').textContent=pct+'%';
+  const segs=[
+    {key:'completed',color:'#00c5a1',label:'Completed'},
+    {key:'scheduled',color:'#7c5cbf',label:'Scheduled'},
+    {key:'received',color:'#8896ab',label:'Received'},
+    {key:'incomplete',color:'#f5a623',label:'Not Completed'},
+    {key:'unreachable',color:'#e8453c',label:'Unable to Reach'},
+  ];
+  document.getElementById('rateBarTrack').innerHTML=segs.map(s=>`<div class="rate-seg" style="width:${Math.round((c[s.key]||0)/total*100)}%;background:${s.color}"></div>`).join('');
+  document.getElementById('rateLegend').innerHTML=segs.map(s=>`<div class="rate-legend-item"><div class="rate-legend-dot" style="background:${s.color}"></div>${s.label}: <span class="rate-legend-val">${c[s.key]||0} (${Math.round((c[s.key]||0)/total*100)}%)</span></div>`).join('');
+}
+
+// ── Stats ─────────────────────────────────────────────────────────────────────
 function renderStats(){
   const c={all:patients.length,received:0,scheduled:0,completed:0,incomplete:0,unreachable:0};
   patients.forEach(p=>c[p.status]=(c[p.status]||0)+1);
@@ -414,6 +502,127 @@ function renderStats(){
     '<div class="stat-card"><div class="stat-label">Received Today</div><div class="stat-val">'+patients.filter(p=>p.orderDate===new Date().toISOString().slice(0,10)).length+'</div></div>';
 }
 
+// ── METRICS VIEW ──────────────────────────────────────────────────────────────
+function renderMetrics(){
+  const total=patients.length;
+  const c={completed:0,scheduled:0,received:0,incomplete:0,unreachable:0};
+  patients.forEach(p=>c[p.status]=(c[p.status]||0)+1);
+  const pct=total?Math.round((c.completed/total)*100):0;
+
+  // Mini stats
+  document.getElementById('miniStats').innerHTML=
+    '<div class="mini-stat"><div class="mini-stat-val" style="color:var(--teal)">'+pct+'%</div><div class="mini-stat-label">Completion Rate</div></div>'+
+    '<div class="mini-stat"><div class="mini-stat-val">'+total+'</div><div class="mini-stat-label">Total Patients</div></div>'+
+    '<div class="mini-stat"><div class="mini-stat-val" style="color:var(--amber)">'+(c.incomplete+c.unreachable)+'</div><div class="mini-stat-label">Needs Attention</div></div>';
+
+  // Big pct
+  document.getElementById('bigPct').textContent=pct+'%';
+  document.getElementById('bigPctSub').textContent=c.completed+' of '+total+' orders completed';
+  const segs=[
+    {key:'completed',color:'#00c5a1'},{key:'scheduled',color:'#7c5cbf'},
+    {key:'received',color:'#8896ab'},{key:'incomplete',color:'#f5a623'},{key:'unreachable',color:'#e8453c'},
+  ];
+  document.getElementById('metricsRateBar').innerHTML=total?segs.map(s=>`<div style="height:100%;width:${Math.round((c[s.key]||0)/total*100)}%;background:${s.color};display:inline-block"></div>`).join(''):'';
+
+  // Donut
+  renderDonut(c,total);
+
+  // Leaderboard
+  renderLeaderboard();
+}
+
+function renderDonut(c,total){
+  const segs=[
+    {key:'completed',color:'#00c5a1',label:'Completed'},
+    {key:'scheduled',color:'#7c5cbf',label:'Scheduled'},
+    {key:'received',color:'#8896ab',label:'Received'},
+    {key:'incomplete',color:'#f5a623',label:'Not Completed'},
+    {key:'unreachable',color:'#e8453c',label:'Unable to Reach'},
+  ];
+  const cx=60,cy=60,r=46,stroke=16;
+  let offset=0;
+  let paths='';
+  const circ=2*Math.PI*r;
+  segs.forEach(s=>{
+    const val=c[s.key]||0;
+    const pct=total?val/total:0;
+    const dash=pct*circ;
+    if(dash>0){
+      paths+=`<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${s.color}" stroke-width="${stroke}" stroke-dasharray="${dash} ${circ-dash}" stroke-dashoffset="${-offset*circ}" transform="rotate(-90 ${cx} ${cy})"/>`;
+      offset+=pct;
+    }
+  });
+  document.getElementById('donutSvg').innerHTML=paths+`<text x="${cx}" y="${cy-4}" text-anchor="middle" font-size="16" font-weight="700" fill="#0d1b2e">${total?Math.round((c.completed/total)*100):0}%</text><text x="${cx}" y="${cy+14}" text-anchor="middle" font-size="9" fill="#8896ab">COMPLETE</text>`;
+  document.getElementById('donutLegend').innerHTML=segs.filter(s=>c[s.key]>0).map(s=>`<div class="donut-legend-row"><div class="donut-legend-left"><div class="donut-legend-dot" style="background:${s.color}"></div><span>${s.label}</span></div><span class="donut-legend-pct">${c[s.key]} (${total?Math.round((c[s.key]/total)*100):0}%)</span></div>`).join('');
+}
+
+function renderLeaderboard(){
+  // Build provider map
+  const provMap={};
+  patients.forEach(p=>{
+    const a=getAssignee(p)||'Unassigned';
+    if(!provMap[a])provMap[a]={name:a,completed:0,scheduled:0,received:0,incomplete:0,unreachable:0,total:0};
+    provMap[a][p.status]=(provMap[a][p.status]||0)+1;
+    provMap[a].total++;
+  });
+
+  const providers=Object.values(provMap).sort((a,b)=>b.completed-a.completed);
+  const maxCompleted=providers.length?providers[0].completed:1;
+
+  // Provider filter pills
+  const allProviders=['all',...providers.map(p=>p.name)];
+  document.getElementById('providerPills').innerHTML=allProviders.map(p=>`<div class="provider-pill${selectedProvider===p?' active':''}" onclick="setProviderFilter('${p}')">${p==='all'?'All Providers':p}</div>`).join('');
+
+  // Filter
+  const filtered=selectedProvider==='all'?providers:providers.filter(p=>p.name===selectedProvider);
+
+  const rankIcon=(i)=>i===0?'&#129351;':i===1?'&#129352;':i===2?'&#129353;':'';
+  const rankClass=(i)=>i===0?'gold':i===1?'silver':i===2?'bronze':'';
+
+  document.getElementById('leaderboard').innerHTML=filtered.length?filtered.map((p,i)=>{
+    const color=providerColor(p.name);
+    const barW=maxCompleted?Math.round((p.completed/maxCompleted)*100):0;
+    const compPct=p.total?Math.round((p.completed/p.total)*100):0;
+    return `<div class="lb-row">
+      <div class="lb-rank ${rankClass(i)}">${rankIcon(i)||'#'+(i+1)}</div>
+      <div class="lb-avatar" style="background:${color}22;color:${color}">${initials(p.name)}</div>
+      <div class="lb-info">
+        <div class="lb-name">${p.name} <span style="font-size:11px;color:var(--text-soft);font-weight:400">${compPct}% completion</span></div>
+        <div class="lb-bar-wrap">
+          <div class="lb-bar-track"><div class="lb-bar-fill" style="width:${barW}%;background:${color}"></div></div>
+        </div>
+      </div>
+      <div class="lb-stats">
+        <div class="lb-stat"><div class="lb-stat-val" style="color:var(--teal)">${p.completed}</div><div class="lb-stat-label">Done</div></div>
+        <div class="lb-stat"><div class="lb-stat-val" style="color:var(--purple)">${p.scheduled}</div><div class="lb-stat-label">Sched</div></div>
+        <div class="lb-stat"><div class="lb-stat-val" style="color:var(--amber)">${p.incomplete+p.unreachable}</div><div class="lb-stat-label">Issues</div></div>
+        <div class="lb-stat"><div class="lb-stat-val">${p.total}</div><div class="lb-stat-label">Total</div></div>
+      </div>
+    </div>`;
+  }).join(''):'<div style="text-align:center;padding:24px;color:var(--text-soft)">No data yet. Add patients with assigned providers.</div>';
+}
+
+function setProviderFilter(name){
+  selectedProvider=name;
+  renderLeaderboard();
+}
+
+// ── Render tracker ────────────────────────────────────────────────────────────
+function getFiltered(){
+  const q=(document.getElementById('searchInput').value||'').toLowerCase();
+  const sort=document.getElementById('sortSelect').value;
+  let list=patients.filter(p=>{
+    if(currentFilter!=='all'&&p.status!==currentFilter)return false;
+    if(q&&![p.name,p.provider||'',p.service||'',p.phone||'',getAssignee(p)].join(' ').toLowerCase().includes(q))return false;
+    return true;
+  });
+  if(sort==='newest')list.sort((a,b)=>new Date(b.receivedAt||b.orderDate)-new Date(a.receivedAt||a.orderDate));
+  else if(sort==='oldest')list.sort((a,b)=>new Date(a.receivedAt||a.orderDate)-new Date(b.receivedAt||b.orderDate));
+  else if(sort==='name')list.sort((a,b)=>a.name.localeCompare(b.name));
+  else if(sort==='status'){const O={received:0,scheduled:1,completed:2,incomplete:3,unreachable:4};list.sort((a,b)=>(O[a.status]||0)-(O[b.status]||0));}
+  return list;
+}
+
 const BADGE={received:'sb-received',scheduled:'sb-scheduled',completed:'sb-completed',incomplete:'sb-incomplete',unreachable:'sb-unreachable'};
 const BADGE_LABEL={received:'Order Received',scheduled:'Appt Scheduled',completed:'Completed',incomplete:'Not Completed',unreachable:'Unable to Reach'};
 
@@ -425,17 +634,17 @@ function segClass(status,step){
   if(sn===cur){if(status==='completed')return 'done';if(status==='scheduled')return 'purple';if(status==='incomplete')return 'warn';if(status==='unreachable')return 'danger';return 'done';}
   return '';
 }
-
-function sourceLabel(s){if(s==='ghl_webhook')return '<span class="source-tag ghl">GHL</span>';if(s==='csv_import')return '<span class="source-tag csv">CSV</span>';return '<span class="source-tag">Manual</span>';}
+function sourceLabel(s){if(s==='ghl_webhook')return '<span class="source-tag ghl">GHL</span>';if(s==='csv_import'||s==='csv')return '<span class="source-tag csv">CSV</span>';return '<span class="source-tag">Manual</span>';}
 
 function renderCard(p){
   const [bg,fg]=palette(p.id);
   const isOpen=openCardId===p.id;
+  const assignee=getAssignee(p);
   const stageLabel={received:'Waiting to schedule',scheduled:'Appt: '+(p.apptDate||'TBD')+(p.apptTime?' @ '+p.apptTime:''),completed:'Done: '+(p.completedDate||''),incomplete:'Not completed',unreachable:'Unable to reach'}[p.status]||'';
   return '<div class="pcard'+(isOpen?' open':'')+'" id="pc-'+p.id+'" onclick="toggleCard(\''+p.id+'\')">'+
     '<div class="pcard-top">'+
     '<div class="avatar" style="background:'+bg+';color:'+fg+'">'+initials(p.name)+'</div>'+
-    '<div class="pcard-info"><div class="pcard-name">'+p.name+'</div><div class="pcard-meta">'+(p.service||'--')+' &middot; '+(p.provider||'--')+'</div></div>'+
+    '<div class="pcard-info"><div class="pcard-name">'+p.name+'</div><div class="pcard-meta">'+(p.service||'--')+' &middot; '+(p.provider||'--')+(assignee?' &middot; <strong>'+assignee+'</strong>':'')+'</div></div>'+
     '<div class="pcard-right">'+sourceLabel(p.source)+'<span class="sbadge '+(BADGE[p.status]||'sb-received')+'">'+(BADGE_LABEL[p.status]||p.status)+'</span><span class="chevron">&#9660;</span></div>'+
     '</div>'+
     '<div class="journey-wrap"><div class="j-seg '+segClass(p.status,'received')+'"></div><div class="j-seg '+segClass(p.status,'scheduled')+'"></div><div class="j-seg '+segClass(p.status,'completed')+'"></div><span class="j-label">'+stageLabel+'</span></div>'+
@@ -444,12 +653,13 @@ function renderCard(p){
 }
 
 function renderDetailHTML(p){
+  const assignee=getAssignee(p);
   return '<div class="detail-inner">'+
     '<div class="dsec"><div class="dsec-title">Patient Info</div>'+
     '<div class="drow"><span class="drow-label">DOB</span><span class="drow-val">'+(p.dob||'--')+'</span></div>'+
     '<div class="drow"><span class="drow-label">Phone</span><span class="drow-val">'+(p.phone||'--')+'</span></div>'+
-    '<div class="drow"><span class="drow-label">Email</span><span class="drow-val">'+(p.email||'--')+'</span></div>'+
     '<div class="drow"><span class="drow-label">Provider</span><span class="drow-val">'+(p.provider||'--')+'</span></div>'+
+    '<div class="drow"><span class="drow-label">Assigned To</span><span class="drow-val">'+(assignee||'--')+'</span></div>'+
     '<div class="drow"><span class="drow-label">Order Date</span><span class="drow-val">'+(p.orderDate||'--')+'</span></div></div>'+
     '<div class="dsec"><div class="dsec-title">Journey Timeline</div><div class="timeline">'+
     '<div class="tl-row"><div class="tl-dot done">&#10003;</div><div class="tl-info"><div class="tl-name">Order Received</div><div class="tl-date">'+(p.orderDate||'--')+'</div></div></div>'+
@@ -468,8 +678,8 @@ function buildUpdateRow(p){
   let extras='';
   if(s==='scheduled')extras='<input class="ctrl-input" type="date" id="ua-'+p.id+'" value="'+(p.apptDate||'')+'"><input class="ctrl-input" type="time" id="ub-'+p.id+'" value="'+(p.apptTime||'')+'">';
   if(s==='completed')extras='<input class="ctrl-input" type="date" id="ua-'+p.id+'" value="'+(p.completedDate||'')+'"><input class="ctrl-input" type="time" id="ub-'+p.id+'" value="'+(p.completedTime||'')+'">';
-  if(s==='incomplete')extras='<input class="ctrl-input" id="ua-'+p.id+'" value="'+(p.incompleteReason||'')+'" placeholder="Reason not completed" style="flex:1;min-width:180px">';
-  if(s==='unreachable')extras='<input class="ctrl-input" id="ua-'+p.id+'" value="'+(p.unreachableReason||'')+'" placeholder="Reason unable to reach" style="flex:1;min-width:180px">';
+  if(s==='incomplete')extras='<input class="ctrl-input" id="ua-'+p.id+'" value="'+(p.incompleteReason||'')+'" placeholder="Reason" style="flex:1;min-width:160px">';
+  if(s==='unreachable')extras='<input class="ctrl-input" id="ua-'+p.id+'" value="'+(p.unreachableReason||'')+'" placeholder="Reason" style="flex:1;min-width:160px">';
   return '<select class="ctrl-select" id="us-'+p.id+'" onchange="refreshUpdateRow(\''+p.id+'\')">'+
     '<option value="received"'+(s==='received'?' selected':'')+'>Order Received</option>'+
     '<option value="scheduled"'+(s==='scheduled'?' selected':'')+'>Appt Scheduled</option>'+
@@ -487,8 +697,8 @@ function refreshUpdateRow(id){
   let extras='';
   if(s==='scheduled')extras='<input class="ctrl-input" type="date" id="ua-'+id+'" value="'+(p.apptDate||'')+'"><input class="ctrl-input" type="time" id="ub-'+id+'" value="'+(p.apptTime||'')+'">';
   if(s==='completed')extras='<input class="ctrl-input" type="date" id="ua-'+id+'" value="'+(p.completedDate||'')+'"><input class="ctrl-input" type="time" id="ub-'+id+'" value="'+(p.completedTime||'')+'">';
-  if(s==='incomplete')extras='<input class="ctrl-input" id="ua-'+id+'" value="'+(p.incompleteReason||'')+'" placeholder="Reason not completed" style="flex:1;min-width:180px">';
-  if(s==='unreachable')extras='<input class="ctrl-input" id="ua-'+id+'" value="'+(p.unreachableReason||'')+'" placeholder="Reason unable to reach" style="flex:1;min-width:180px">';
+  if(s==='incomplete')extras='<input class="ctrl-input" id="ua-'+id+'" value="'+(p.incompleteReason||'')+'" placeholder="Reason" style="flex:1;min-width:160px">';
+  if(s==='unreachable')extras='<input class="ctrl-input" id="ua-'+id+'" value="'+(p.unreachableReason||'')+'" placeholder="Reason" style="flex:1;min-width:160px">';
   document.getElementById('ue-'+id).innerHTML=extras;
 }
 
@@ -502,10 +712,8 @@ function saveStatus(id){
   if(s==='completed'){updates.completedDate=ua;updates.completedTime=ub;}
   if(s==='incomplete'){updates.incompleteReason=ua;}
   if(s==='unreachable'){updates.unreachableReason=ua;}
-  Object.assign(p,updates);
-  patchPatient(id,updates);
-  renderAll();openCardId=id;renderAll();
-  toast('Status updated');
+  Object.assign(p,updates);patchPatient(id,updates);
+  renderAll();renderMetrics();openCardId=id;renderAll();toast('Status updated');
 }
 
 function saveNotes(id){
@@ -514,12 +722,10 @@ function saveNotes(id){
   patchPatient(id,{notes:val});toast('Notes saved');
 }
 
-function confirmDelete(id){
-  if(confirm('Remove this patient from the tracker?')){deletePatient(id);toast('Patient removed');}
-}
+function confirmDelete(id){if(confirm('Remove this patient?')){deletePatient(id);toast('Patient removed');}}
 
 function renderAll(){
-  renderStats();
+  renderStats();renderRateBar();
   const list=getFiltered();
   const grid=document.getElementById('patientGrid');
   if(!list.length){grid.innerHTML='<div class="empty"><div class="empty-icon">&#128203;</div><div class="empty-title">No patients found</div><div>Adjust the filter or add a new patient order.</div></div>';return;}
@@ -527,18 +733,17 @@ function renderAll(){
 }
 
 function toggleCard(id){
-  openCardId=openCardId===id?null:id;
-  renderAll();
+  openCardId=openCardId===id?null:id;renderAll();
   if(openCardId){const el=document.getElementById('pc-'+id);if(el)setTimeout(()=>el.scrollIntoView({behavior:'smooth',block:'nearest'}),100);}
 }
 
 function setFilter(f,el){
   currentFilter=f;
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
-  if(el)el.classList.add('active');
-  renderAll();
+  if(el)el.classList.add('active');renderAll();
 }
 
+// ── Modals ────────────────────────────────────────────────────────────────────
 function openModal(){document.getElementById('modalOverlay').classList.add('open');}
 function closeModal(){document.getElementById('modalOverlay').classList.remove('open');}
 document.getElementById('modalOverlay').addEventListener('click',e=>{if(e.target===document.getElementById('modalOverlay'))closeModal();});
@@ -546,26 +751,20 @@ document.getElementById('modalOverlay').addEventListener('click',e=>{if(e.target
 async function submitPatient(){
   const name=document.getElementById('f-name').value.trim();
   if(!name){alert('Patient name is required.');return;}
-  const data={name,dob:document.getElementById('f-dob').value,provider:document.getElementById('f-provider').value,service:document.getElementById('f-service').value,phone:document.getElementById('f-phone').value,email:document.getElementById('f-email').value,orderDate:document.getElementById('f-orderdate').value||new Date().toISOString().slice(0,10),notes:document.getElementById('f-notes').value,status:'received',apptDate:'',apptTime:'',completedDate:'',completedTime:'',incompleteReason:'',unreachableReason:'',source:'manual',receivedAt:new Date().toISOString()};
-  await addPatient(data);closeModal();renderAll();toast('Patient added');
-  ['f-name','f-dob','f-provider','f-service','f-phone','f-email','f-orderdate','f-notes'].forEach(id=>document.getElementById(id).value='');
+  const data={name,dob:document.getElementById('f-dob').value,provider:document.getElementById('f-provider').value,service:document.getElementById('f-service').value,phone:document.getElementById('f-phone').value,email:document.getElementById('f-email').value,assignee:document.getElementById('f-assignee').value,orderDate:document.getElementById('f-orderdate').value||new Date().toISOString().slice(0,10),notes:document.getElementById('f-notes').value,status:'received',apptDate:'',apptTime:'',completedDate:'',completedTime:'',incompleteReason:'',unreachableReason:'',source:'manual',receivedAt:new Date().toISOString()};
+  await addPatient(data);closeModal();renderAll();renderMetrics();toast('Patient added');
+  ['f-name','f-dob','f-provider','f-service','f-phone','f-email','f-assignee','f-orderdate','f-notes'].forEach(id=>document.getElementById(id).value='');
 }
 
 // ── Bulk Import ───────────────────────────────────────────────────────────────
-const CSV_HEADERS=['name','dob','provider','service','phone','email','notes'];
-const CSV_ALIASES={'patient name':'name','full name':'name','patient':'name','date of birth':'dob','birthdate':'dob','birth date':'dob','ordering provider':'provider','doctor':'provider','physician':'provider','test ordered':'service','tests':'service','lab order':'service','phone number':'phone','cell':'phone','email address':'email','special instructions':'notes','intake notes':'notes'};
+const CSV_HEADERS=['name','dob','provider','service','phone','email','assignee','notes','status','apptDate','apptTime','completedDate','completedTime'];
+const CSV_ALIASES={'patient name':'name','full name':'name','date of birth':'dob','birthdate':'dob','ordering provider':'provider','doctor':'provider','test ordered':'service','tests':'service','phone number':'phone','email address':'email','assigned to':'assignee','assigned':'assignee','intake notes':'notes','special instructions':'notes'};
 
 function openImportModal(){
-  importRows=[];
-  document.getElementById('importPreview').style.display='none';
-  document.getElementById('importSubmitBtn').style.display='none';
-  document.getElementById('dropLabel').textContent='Drop your CSV file here';
-  document.getElementById('dropSub').textContent='or click to browse';
-  document.getElementById('dropZone').classList.remove('file-chosen');
-  document.getElementById('pasteInput').value='';
-  document.getElementById('csvFileInput').value='';
-  switchImportTab('csv');
-  document.getElementById('importOverlay').classList.add('open');
+  importRows=[];document.getElementById('importPreview').style.display='none';document.getElementById('importSubmitBtn').style.display='none';
+  document.getElementById('dropLabel').textContent='Drop your CSV file here';document.getElementById('dropSub').textContent='or click to browse';
+  document.getElementById('dropZone').classList.remove('file-chosen');document.getElementById('pasteInput').value='';document.getElementById('csvFileInput').value='';
+  switchImportTab('csv');document.getElementById('importOverlay').classList.add('open');
 }
 function closeImportModal(){document.getElementById('importOverlay').classList.remove('open');importRows=[];}
 document.getElementById('importOverlay').addEventListener('click',e=>{if(e.target===document.getElementById('importOverlay'))closeImportModal();});
@@ -579,8 +778,7 @@ function switchImportTab(tab){
 }
 
 function parseCSVText(text){
-  const lines=text.trim().split(/\r?\n/).filter(l=>l.trim());
-  if(!lines.length)return[];
+  const lines=text.trim().split(/\r?\n/).filter(l=>l.trim());if(!lines.length)return[];
   const delim=lines[0].includes('\t')?'\t':',';
   const splitLine=line=>{const result=[];let cur='';let inQ=false;for(let i=0;i<line.length;i++){const c=line[i];if(c==='"'){inQ=!inQ;}else if(c===delim&&!inQ){result.push(cur.trim());cur='';}else cur+=c;}result.push(cur.trim());return result;};
   const rawH=splitLine(lines[0]).map(h=>h.toLowerCase().replace(/['"]/g,'').trim());
@@ -591,51 +789,36 @@ function parseCSVText(text){
 }
 
 function showPreview(rows){
-  importRows=rows;
-  const preview=document.getElementById('importPreview');
+  importRows=rows;const preview=document.getElementById('importPreview');
   if(!rows.length){preview.style.display='none';document.getElementById('importSubmitBtn').style.display='none';return;}
-  const cols=['name','dob','provider','service','phone'];
+  const cols=['name','dob','provider','assignee','phone','status'];
   document.getElementById('previewTable').innerHTML='<thead><tr>'+cols.map(c=>'<th>'+c+'</th>').join('')+'</tr></thead><tbody>'+rows.slice(0,5).map(r=>'<tr>'+cols.map(c=>'<td>'+(r[c]||'--')+'</td>').join('')+'</tr>').join('')+(rows.length>5?'<tr><td colspan="'+cols.length+'" style="color:var(--text-soft);text-align:center">...and '+(rows.length-5)+' more</td></tr>':'')+'</tbody>';
   document.getElementById('importSummary').innerHTML='<div class="imp-stat">Ready to import: <span>'+rows.length+'</span> patients</div>';
-  preview.style.display='block';
-  document.getElementById('importSubmitBtn').style.display='block';
+  preview.style.display='block';document.getElementById('importSubmitBtn').style.display='block';
 }
 
-function handleFileSelect(e){
-  const file=e.target.files[0];if(!file)return;
-  const reader=new FileReader();
-  reader.onload=ev=>{const rows=parseCSVText(ev.target.result);document.getElementById('dropLabel').textContent=file.name;document.getElementById('dropSub').textContent=rows.length+' patients found';document.getElementById('dropZone').classList.add('file-chosen');showPreview(rows);};
-  reader.readAsText(file);
-}
+function handleFileSelect(e){const file=e.target.files[0];if(!file)return;const reader=new FileReader();reader.onload=ev=>{const rows=parseCSVText(ev.target.result);document.getElementById('dropLabel').textContent=file.name;document.getElementById('dropSub').textContent=rows.length+' patients found';document.getElementById('dropZone').classList.add('file-chosen');showPreview(rows);};reader.readAsText(file);}
 function handleDragOver(e){e.preventDefault();document.getElementById('dropZone').classList.add('dragover');}
 function handleDragLeave(){document.getElementById('dropZone').classList.remove('dragover');}
-function handleDrop(e){
-  e.preventDefault();document.getElementById('dropZone').classList.remove('dragover');
-  const file=e.dataTransfer.files[0];if(!file)return;
-  const reader=new FileReader();
-  reader.onload=ev=>{const rows=parseCSVText(ev.target.result);document.getElementById('dropLabel').textContent=file.name;document.getElementById('dropSub').textContent=rows.length+' patients found';document.getElementById('dropZone').classList.add('file-chosen');showPreview(rows);};
-  reader.readAsText(file);
-}
-function parsePaste(){
-  const text=document.getElementById('pasteInput').value;
-  if(!text.trim()){importRows=[];document.getElementById('importPreview').style.display='none';document.getElementById('importSubmitBtn').style.display='none';return;}
-  showPreview(parseCSVText(text));
-}
+function handleDrop(e){e.preventDefault();document.getElementById('dropZone').classList.remove('dragover');const file=e.dataTransfer.files[0];if(!file)return;const reader=new FileReader();reader.onload=ev=>{const rows=parseCSVText(ev.target.result);document.getElementById('dropLabel').textContent=file.name;document.getElementById('dropSub').textContent=rows.length+' patients found';document.getElementById('dropZone').classList.add('file-chosen');showPreview(rows);};reader.readAsText(file);}
+function parsePaste(){const text=document.getElementById('pasteInput').value;if(!text.trim()){importRows=[];document.getElementById('importPreview').style.display='none';document.getElementById('importSubmitBtn').style.display='none';return;}showPreview(parseCSVText(text));}
 
 async function runImport(){
   if(!importRows.length)return;
   const btn=document.getElementById('importSubmitBtn');btn.textContent='Importing...';btn.disabled=true;
   let success=0;
   for(const row of importRows){
-    await addPatient({name:row.name,dob:row.dob||'',provider:row.provider||'',service:row.service||'',phone:row.phone||'',email:row.email||'',notes:row.notes||'',orderDate:new Date().toISOString().slice(0,10),status:'received',apptDate:'',apptTime:'',completedDate:'',completedTime:'',incompleteReason:'',unreachableReason:'',source:'csv_import',receivedAt:new Date().toISOString()});
+    const validStatuses=['received','scheduled','completed','incomplete','unreachable'];
+    const status=validStatuses.includes(row.status)?row.status:'received';
+    await addPatient({name:row.name,dob:row.dob||'',provider:row.provider||'',service:row.service||'',phone:row.phone||'',email:row.email||'',assignee:row.assignee||'',notes:row.notes||'',status,apptDate:row.apptDate||'',apptTime:row.apptTime||'',completedDate:row.completedDate||'',completedTime:row.completedTime||'',incompleteReason:'',unreachableReason:'',source:'csv_import',orderDate:new Date().toISOString().slice(0,10),receivedAt:new Date().toISOString()});
     success++;
   }
-  closeImportModal();renderAll();toast(success+' patient'+(success!==1?'s':'')+' imported successfully');
+  closeImportModal();renderAll();renderMetrics();toast(success+' patient'+(success!==1?'s':'')+' imported');
   btn.textContent='Import Patients';btn.disabled=false;
 }
 
 function downloadTemplate(){
-  const blob=new Blob(['name,dob,provider,service,phone,email,notes\nJohn Smith,1980-01-15,Dr. Lee / BMC,CBC,617-555-0101,j.smith@email.com,Fasting required'],{type:'text/csv'});
+  const blob=new Blob(['name,dob,provider,service,phone,email,assignee,notes,status,apptDate,apptTime,completedDate,completedTime\nJohn Smith,1980-01-15,Dr. Lee / BMC,CBC,617-555-0101,j.smith@email.com,Dara Chase,Fasting required,scheduled,2026-04-05,09:00,,'],{type:'text/csv'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='bmh-patient-import-template.csv';a.click();
 }
 
