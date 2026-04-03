@@ -825,7 +825,7 @@ let toastTimer;
 function toast(msg){const el=document.getElementById('toast');el.textContent=msg;el.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('show'),2800);}
 
 // ── Init ──────────────────────────────────────────────────────────────────────
-setTimeout(fetchPatients, 500);
+setTimeout(fetchPatients, 1500);
 setInterval(fetchPatients,POLL_INTERVAL);
 </script>
 </body>
