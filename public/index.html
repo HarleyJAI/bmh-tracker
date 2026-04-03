@@ -613,9 +613,7 @@ function getFiltered(){
   const sort=document.getElementById('sortSelect').value;
   let list=patients.filter(p=>{
     if(currentFilter!=='all'&&p.status!==currentFilter)return false;
-    if(q&&![p.name,p.provider||'',p.service||'',p.phone||'',getAssignee(p)].join(' ').toLowerCase().includes(q))return false;
-    return true;
-  });
+   if(q&&![p.name,p.provider||'',p.service||'',p.phone||'',getAssignee(p),p.notes||''].join(' ').toLowerCase().includes(q))return false;
   if(sort==='newest')list.sort((a,b)=>new Date(b.receivedAt||b.orderDate)-new Date(a.receivedAt||a.orderDate));
   else if(sort==='oldest')list.sort((a,b)=>new Date(a.receivedAt||a.orderDate)-new Date(b.receivedAt||b.orderDate));
   else if(sort==='name')list.sort((a,b)=>a.name.localeCompare(b.name));
