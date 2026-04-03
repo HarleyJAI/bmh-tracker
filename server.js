@@ -128,7 +128,7 @@ const GHL_FIELD_MAP = {
   phone:     ['phone','phone_number','contact.phone'],
   email:     ['email','contact.email'],
   address:   ['address','contact.address1'],
-  mrn:       ['mrn','MRN'],
+  mrn:       ['number_14fga', 'mrn', 'MRN'],
   service:   ['test_ordered','service','lab_order'],
   provider:  ['ordering_provider','provider'],
   assignee:  ['appointment_owner','assigned_to','assignee'],
