@@ -27,14 +27,13 @@ let patients = [];
 // Map your GHL form field names to the tracker's data model.
 // Update these keys to match the "Field Key" values in your GHL form builder.
 const GHL_FIELD_MAP = {
-  name:         ['full_name', 'name', 'contact.name', 'first_name'],
-  dob:          ['date_of_birth', 'dob', 'birthdate'],
-  provider:     ['ordering_provider', 'provider', 'doctor_name', 'referring_provider'],
-  service:      ['test_ordered', 'service', 'lab_order', 'tests_requested'],
-  phone:        ['phone', 'contact.phone', 'phone_number'],
-  email:        ['email', 'contact.email'],
-  address:      ['address', 'contact.address1'],
-  notes:        ['notes', 'special_instructions', 'intake_notes'],
+  name:     ['first_name'],
+  lastName: ['last_name'],
+  dob:      ['date_of_birth'],
+  phone:    ['phone'],
+  email:    ['email'],
+  address:  ['address'],
+  notes:    ['mrn'],
 };
 
 function extractField(payload, keys) {
@@ -62,7 +61,7 @@ function buildPatient(payload) {
     source: 'ghl_webhook',
     receivedAt: now.toISOString(),
     // Core fields
-    name:         extractField(payload, GHL_FIELD_MAP.name) || 'Unknown Patient',
+    name:           (extractField(payload, GHL_FIELD_MAP.name) + ' ' + extractField(payload, GHL_FIELD_MAP.lastName)).trim() || 'Unknown Patient',
     dob:          extractField(payload, GHL_FIELD_MAP.dob),
     provider:     extractField(payload, GHL_FIELD_MAP.provider),
     service:      extractField(payload, GHL_FIELD_MAP.service),
