@@ -187,6 +187,91 @@ app.post('/webhook/ghl', async (req, res) => {
   }
 });
 
+// GHL Status Update Webhook — fires on appointment status change
+// Maps: Unconfirmed→Order Received, Confirmed→Appt Scheduled, 
+//       Showed→Completed, No Show→Unable to Reach, Cancelled→Not Completed
+const GHL_STATUS_MAP = {
+  'unconfirmed':  'Order Received',
+  'confirmed':    'Appt Scheduled',
+  'showed':       'Completed',
+  'show':         'Completed',
+  'no show':      'Unable to Reach',
+  'noshow':       'Unable to Reach',
+  'no_show':      'Unable to Reach',
+  'cancelled':    'Not Completed',
+  'canceled':     'Not Completed',
+  'booked':       'Appt Scheduled',
+};
+
+app.post('/webhook/ghl-status', async (req, res) => {
+  try {
+    console.log('[STATUS WEBHOOK] Incoming payload:', JSON.stringify(req.body).slice(0, 300));
+    const body = req.body;
+
+    // Get the GHL appointment status and map it
+    const rawStatus = (body.appointment_status || body.status || '').toLowerCase().trim();
+    const mappedStatus = GHL_STATUS_MAP[rawStatus];
+
+    if (!mappedStatus) {
+      console.log('[STATUS WEBHOOK] Unknown status:', rawStatus, '— skipping');
+      return res.status(200).json({ success: true, message: 'Status not mapped: ' + rawStatus });
+    }
+
+    // Find patient by MRN or phone or email
+    const mrn   = extractField(body, GHL_FIELD_MAP.mrn);
+    const phone = extractField(body, GHL_FIELD_MAP.phone);
+    const email = extractField(body, GHL_FIELD_MAP.email);
+    const assignee = extractField(body, ['assignee', 'appointment_owner', 'assigned_user', 'appointment.assigned_user']);
+
+    let patientId = null;
+
+    if (mrn) {
+      const r = await pool.query('SELECT id FROM public.patients WHERE mrn = $1 LIMIT 1', [mrn]);
+      if (r.rows.length) patientId = r.rows[0].id;
+    }
+    if (!patientId && phone) {
+      const r = await pool.query('SELECT id FROM public.patients WHERE phone = $1 LIMIT 1', [phone]);
+      if (r.rows.length) patientId = r.rows[0].id;
+    }
+    if (!patientId && email) {
+      const r = await pool.query('SELECT id FROM public.patients WHERE email = $1 LIMIT 1', [email]);
+      if (r.rows.length) patientId = r.rows[0].id;
+    }
+
+    if (!patientId) {
+      console.log('[STATUS WEBHOOK] Patient not found — creating new record');
+      const patient = buildPatientFromGHL(body);
+      patient.status = mappedStatus;
+      if (assignee) patient.assignee = assignee;
+      await insertPatient(patient);
+      return res.status(200).json({ success: true, action: 'created', status: mappedStatus });
+    }
+
+    // Update existing patient
+    const updateData = { status: mappedStatus };
+    if (assignee) updateData.assignee = assignee;
+
+    // Set dates based on status
+    const now = new Date().toISOString();
+    if (mappedStatus === 'Appt Scheduled') {
+      updateData.appt_date = body.appointment_date || now.slice(0, 10);
+      updateData.appt_time = body.appointment_time || '';
+    }
+    if (mappedStatus === 'Completed') {
+      updateData.completed_date = now.slice(0, 10);
+      updateData.completed_time = now.slice(11, 16);
+    }
+
+    await updatePatient(patientId, updateData);
+    console.log('[STATUS WEBHOOK] Updated patient', patientId, '→', mappedStatus, assignee ? '| Assignee: ' + assignee : '');
+    res.status(200).json({ success: true, action: 'updated', patientId, status: mappedStatus });
+
+  } catch (err) {
+    console.error('[STATUS WEBHOOK ERROR]', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Get all patients
 app.get('/api/patients', async (req, res) => {
   try {
