@@ -489,31 +489,40 @@ async function logAccess(action,recordId){
   });
 }
 
-// ── DATA ──
+// ── DATA — reads/writes go through Railway API (bypasses RLS) ──
+var API = '';  // same origin — Railway serves both the HTML and the API
+
 async function loadPatients(){
-  var res=await sb.from('patients').select('*').order('received_at',{ascending:false});
-  if(res.error){toast('Error loading patients: '+res.error.message);return}
-  patients=res.data||[];
-  renderAll();renderMetrics();
+  try{
+    var r=await fetch(API+'/api/patients');
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    patients=await r.json();
+    renderAll();renderMetrics();
+  }catch(err){toast('Error loading patients: '+err.message)}
 }
 
 async function apiPatch(id,data){
-  var res=await sb.from('patients').update(data).eq('id',id);
-  if(res.error)toast('Update error: '+res.error.message);
-  await logAccess('update_patient',id);
+  try{
+    await fetch(API+'/api/patients/'+id,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+    await logAccess('update_patient',id);
+  }catch(err){toast('Update error: '+err.message)}
 }
 
 async function apiPost(data,cb){
-  var res=await sb.from('patients').insert(data).select().single();
-  if(res.error){toast('Insert error: '+res.error.message);return}
-  await logAccess('add_patient',res.data.id);
-  if(cb)cb(res.data);
+  try{
+    var r=await fetch(API+'/api/patients',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    var p=await r.json();
+    await logAccess('add_patient',p.id);
+    if(cb)cb(p);
+  }catch(err){toast('Insert error: '+err.message)}
 }
 
 async function apiDelete(id){
-  var res=await sb.from('patients').delete().eq('id',id);
-  if(res.error){toast('Delete error: '+res.error.message);return}
-  await logAccess('delete_patient',id);
+  try{
+    await fetch(API+'/api/patients/'+id,{method:'DELETE'});
+    await logAccess('delete_patient',id);
+  }catch(err){toast('Delete error: '+err.message)}
 }
 
 // ── VIEWS ──
@@ -822,7 +831,7 @@ async function runImport(){
   var done=0;
   for(var i=0;i<impRows.length;i++){
     var row=impRows[i];
-    var data={name:row.name,dob:row.dob||'',provider:row.provider||'',service_type:row.service_type||'',phone:row.phone||'',email:row.email||'',assignee:row.assignee||'',notes:row.notes||'',status:valid.includes(row.status)?row.status:'received',appt_date:row.appt_date||'',appt_time:row.appt_time||'',completed_date:row.completed_date||'',completed_time:row.completed_time||'',incomplete_reason:'',unreachable_reason:'',source:'csv_import',order_date:new Date().toISOString().slice(0,10),received_at:new Date().toISOString()};
+    var data={name:row.name,dob:row.dob||'',provider:row.provider||'',service_type:row.service_type||'',phone:row.phone||'',email:row.email||'',assignee:row.assignee||'',notes:row.notes||'',status:valid.includes(row.status)?row.status:'Order Received',appt_date:row.appt_date||'',appt_time:row.appt_time||'',completed_date:row.completed_date||'',completed_time:row.completed_time||'',incomplete_reason:'',unreachable_reason:'',source:'csv_import',order_date:new Date().toISOString().slice(0,10),received_at:new Date().toISOString()};
     await apiPost(data,function(p){patients.unshift(p);done++});
   }
   closeImport();renderAll();renderMetrics();toast(done+' patient'+(done!==1?'s':'')+' imported');btn.textContent='Import Patients';btn.disabled=false;
@@ -846,6 +855,11 @@ window.onload=async function(){
 sb.auth.onAuthStateChange(function(event,session){
   if(event==='SIGNED_OUT'){currentUser=null;currentProfile=null}
 });
+
+// ── LIVE POLLING — refresh every 30s to catch new GHL webhook patients ──
+setInterval(function(){
+  if(currentProfile)loadPatients();
+},30000);
 </script>
 </body>
 </html>
