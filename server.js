@@ -320,7 +320,7 @@ async function start() {
 }
 
 start();  console.log('[DB] No valid DATABASE_URL — using in-memory storage');
-}
+
 
 async function initDB() {
   if (!useDB) return;
