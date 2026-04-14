@@ -1,9 +1,10 @@
-<!DOCTYPE html
+<!DOCTYPE html>
 <html lang="en">
-
+<head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>BMH Patient Journey Tracker</title>
+<title>BMH Patient Tracker</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -17,6 +18,31 @@
   --radius:10px;--radius-lg:14px;--radius-xl:20px;
 }
 body{font-family:var(--font);background:var(--surface);color:var(--text);min-height:100vh;font-size:14px}
+
+/* ── LOGIN ── */
+.login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--navy);padding:20px}
+.login-card{background:#fff;border-radius:var(--radius-xl);padding:40px;width:100%;max-width:420px}
+.login-logo{display:flex;align-items:center;gap:12px;margin-bottom:32px}
+.login-mark{width:44px;height:44px;background:var(--teal);border-radius:12px;display:flex;align-items:center;justify-content:center}
+.login-mark svg{width:24px;height:24px;fill:var(--navy)}
+.login-title{font-size:20px;font-weight:600;color:var(--navy)}
+.login-sub{font-size:12px;color:var(--slate);text-transform:uppercase;letter-spacing:.05em}
+.login-label{font-size:12px;font-weight:500;color:var(--text-mid);margin-bottom:6px;display:block}
+.login-input{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:11px 14px;font-size:14px;color:var(--text);font-family:var(--font);outline:none;margin-bottom:14px}
+.login-input:focus{border-color:var(--teal);background:#fff}
+.login-btn{width:100%;background:var(--teal);color:var(--navy);border:none;border-radius:var(--radius);padding:12px;font-size:14px;font-weight:600;cursor:pointer;font-family:var(--font);margin-top:4px}
+.login-btn:hover{background:var(--teal-dim)}
+.login-btn:disabled{opacity:.6;cursor:not-allowed}
+.login-err{background:var(--red-faint);color:var(--red);border-radius:var(--radius);padding:10px 14px;font-size:13px;margin-bottom:14px;display:none}
+.login-err.show{display:block}
+.login-badge{display:flex;align-items:center;gap:8px;margin-top:24px;padding-top:20px;border-top:1px solid var(--border)}
+.login-badge-icon{font-size:18px}
+.login-badge-text{font-size:11px;color:var(--slate)}
+.login-badge-text strong{color:var(--text-mid)}
+
+/* ── APP ── */
+.app-wrap{display:none}
+.app-wrap.visible{display:block}
 .topbar{background:var(--navy);padding:14px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
 .topbar-brand{display:flex;align-items:center;gap:10px}
 .brand-mark{width:32px;height:32px;background:var(--teal);border-radius:8px;display:flex;align-items:center;justify-content:center}
@@ -27,10 +53,16 @@ body{font-family:var(--font);background:var(--surface);color:var(--text);min-hei
 .live-dot{width:8px;height:8px;border-radius:50%;background:var(--teal);animation:pulse 2s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
 .live-label{color:var(--slate);font-size:12px}
+.user-pill{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.08);border-radius:20px;padding:5px 12px 5px 5px}
+.user-avatar{width:26px;height:26px;border-radius:50%;background:var(--teal);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:var(--navy)}
+.user-name{color:#fff;font-size:12px;font-weight:500}
+.user-id{color:var(--slate);font-size:11px}
 .tab-btn{background:transparent;color:var(--slate);border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:7px 14px;font-size:13px;font-weight:500;cursor:pointer;font-family:var(--font)}
 .tab-btn.active{background:var(--teal);color:var(--navy);border-color:var(--teal)}
 .import-btn{background:transparent;color:var(--teal);border:1px solid var(--teal);border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font)}
 .add-btn{background:var(--teal);color:var(--navy);border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font)}
+.logout-btn{background:transparent;color:var(--slate);border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:7px 12px;font-size:12px;cursor:pointer;font-family:var(--font)}
+.logout-btn:hover{color:#fff;border-color:rgba(255,255,255,.3)}
 .layout{display:grid;grid-template-columns:220px 1fr;min-height:calc(100vh - 61px)}
 .sidebar{background:var(--white);border-right:1px solid var(--border);padding:20px 0}
 .sidebar-section{margin-bottom:24px}
@@ -48,7 +80,6 @@ body{font-family:var(--font);background:var(--surface);color:var(--text);min-hei
 .rate-title{font-size:15px;font-weight:600;color:var(--text)}
 .rate-pct{font-size:28px;font-weight:600;color:var(--teal)}
 .rate-track{height:12px;background:var(--surface2);border-radius:8px;overflow:hidden;display:flex;margin-bottom:12px}
-.rate-seg{height:100%}
 .rate-legend{display:flex;flex-wrap:wrap;gap:12px}
 .rate-legend-item{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-mid)}
 .rate-legend-dot{width:10px;height:10px;border-radius:50%}
@@ -154,6 +185,12 @@ body{font-family:var(--font);background:var(--surface);color:var(--text);min-hei
 .donut-legend-left{display:flex;align-items:center;gap:8px}
 .donut-legend-dot{width:10px;height:10px;border-radius:50%}
 .donut-legend-pct{font-weight:600;color:var(--text)}
+/* Access Log View */
+.log-table{width:100%;border-collapse:collapse;font-size:13px;background:var(--white);border-radius:var(--radius-lg);overflow:hidden;border:1px solid var(--border)}
+.log-table th{background:var(--surface2);padding:10px 14px;text-align:left;color:var(--text-soft);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--border)}
+.log-table td{padding:10px 14px;border-bottom:1px solid var(--border);color:var(--text)}
+.log-table tr:last-child td{border-bottom:none}
+.log-table tr:hover td{background:var(--surface)}
 /* Modal */
 .overlay{position:fixed;inset:0;background:rgba(10,22,40,.55);display:none;align-items:center;justify-content:center;z-index:200;padding:20px}
 .overlay.open{display:flex}
@@ -189,10 +226,43 @@ body{font-family:var(--font);background:var(--surface);color:var(--text);min-hei
 .empty-title{font-size:15px;font-weight:500;color:var(--text-mid);margin-bottom:6px}
 .toast{position:fixed;bottom:24px;right:24px;background:var(--navy);color:#fff;padding:12px 18px;border-radius:10px;font-size:13px;font-weight:500;transform:translateY(80px);opacity:0;transition:all .3s;z-index:500;border-left:3px solid var(--teal)}
 .toast.show{transform:translateY(0);opacity:1}
+.role-badge{font-size:10px;font-weight:600;padding:3px 8px;border-radius:20px;text-transform:uppercase;letter-spacing:.05em}
+.role-admin{background:#e0faf5;color:#009e82}
+.role-phlebotomist{background:#f3f0ff;color:#5a3eb5}
+.role-coordinator{background:#fff8eb;color:#b97c0a}
+.role-compliance{background:#fef2f1;color:#c0392b}
 @media(max-width:700px){.layout{grid-template-columns:1fr}.sidebar{display:none}.stats-strip{grid-template-columns:repeat(2,1fr)}.detail-inner,.metrics-grid,.fgrid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
+
+<!-- ── LOGIN SCREEN ── -->
+<div class="login-wrap" id="loginWrap">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="login-mark">
+        <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/></svg>
+      </div>
+      <div>
+        <div class="login-title">BMH Patient Tracker</div>
+        <div class="login-sub">Beyond Mobile Health — Secure Access</div>
+      </div>
+    </div>
+    <div class="login-err" id="loginErr"></div>
+    <label class="login-label">Email Address</label>
+    <input class="login-input" type="email" id="loginEmail" placeholder="your@beyondmobilehealth.com" autocomplete="email">
+    <label class="login-label">Password</label>
+    <input class="login-input" type="password" id="loginPass" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
+    <button class="login-btn" id="loginBtn" onclick="doLogin()">Sign In</button>
+    <div class="login-badge">
+      <div class="login-badge-icon">🔒</div>
+      <div class="login-badge-text"><strong>HIPAA-Compliant Access</strong> — All sessions are logged per 45 CFR §164.312(a)(2)(i). Unauthorized access is prohibited.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── APP SHELL ── -->
+<div class="app-wrap" id="appWrap">
 <div class="topbar">
   <div class="topbar-brand">
     <div class="brand-mark"><svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/></svg></div>
@@ -200,10 +270,20 @@ body{font-family:var(--font);background:var(--surface);color:var(--text);min-hei
   </div>
   <div class="topbar-right">
     <div class="live-dot"></div><span class="live-label">Live</span>
+    <div class="user-pill">
+      <div class="user-avatar" id="topAvatar">JH</div>
+      <div>
+        <div class="user-name" id="topName">Loading...</div>
+        <div class="user-id" id="topBmhId">BMH-0000</div>
+      </div>
+    </div>
+    <span class="role-badge" id="topRoleBadge"></span>
     <button class="tab-btn active" id="btn-tracker" onclick="switchView('tracker')">Tracker</button>
     <button class="tab-btn" id="btn-metrics" onclick="switchView('metrics')">Metrics</button>
-    <button class="import-btn" onclick="openImport()">&#8593; Import</button>
-    <button class="add-btn" onclick="openAdd()">+ Add Patient</button>
+    <button class="tab-btn" id="btn-log" onclick="switchView('log')" style="display:none" id="logTabBtn">Access Log</button>
+    <button class="import-btn" onclick="openImport()" id="importBtn">&#8593; Import</button>
+    <button class="add-btn" onclick="openAdd()" id="addPatientBtn">+ Add Patient</button>
+    <button class="logout-btn" onclick="doLogout()">Sign Out</button>
   </div>
 </div>
 <div class="layout">
@@ -220,11 +300,12 @@ body{font-family:var(--font);background:var(--surface);color:var(--text);min-hei
     <div class="sidebar-section">
       <div class="sidebar-label">Tools</div>
       <div class="nav-item" onclick="switchView('metrics')">&#128202; Metrics &amp; Leaderboard</div>
-      <div class="nav-item" onclick="openImport()">&#8593; Bulk Import</div>
-      <div class="nav-item" onclick="testWebhook()">&#9881; Inject Test Patient</div>
+      <div class="nav-item" id="sideLogLink" style="display:none" onclick="switchView('log')">&#128196; Access Log</div>
+      <div class="nav-item" onclick="openImport()" id="sideImport">&#8593; Bulk Import</div>
     </div>
   </div>
   <div class="main">
+    <!-- TRACKER VIEW -->
     <div class="view active" id="view-tracker">
       <div class="rate-card">
         <div class="rate-header"><div class="rate-title">Overall Completion Rate</div><div class="rate-pct" id="ratePct">0%</div></div>
@@ -241,6 +322,7 @@ body{font-family:var(--font);background:var(--surface);color:var(--text);min-hei
       </div>
       <div class="patient-grid" id="patientGrid"></div>
     </div>
+    <!-- METRICS VIEW -->
     <div class="view" id="view-metrics">
       <div class="mini-stats" id="miniStats"></div>
       <div class="metrics-grid">
@@ -249,7 +331,19 @@ body{font-family:var(--font);background:var(--surface);color:var(--text);min-hei
         <div class="mcard"><div class="mcard-title">&#9989; Completion Rate</div><div style="text-align:center;padding:16px 0"><div style="font-size:52px;font-weight:700;color:var(--teal)" id="bigPct">0%</div><div style="font-size:13px;color:var(--text-soft);margin-top:4px" id="bigPctSub"></div></div><div id="metricsBar" style="height:16px;border-radius:8px;background:var(--surface2);overflow:hidden;display:flex"></div></div>
       </div>
     </div>
+    <!-- ACCESS LOG VIEW -->
+    <div class="view" id="view-log">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+        <div>
+          <div style="font-size:18px;font-weight:600;color:var(--text)">Access Log</div>
+          <div style="font-size:13px;color:var(--text-soft);margin-top:2px">HIPAA 164.312(a)(2)(i) — All PHI access events</div>
+        </div>
+        <button class="import-btn" onclick="exportLog()">&#8595; Export CSV</button>
+      </div>
+      <div id="logTableWrap"></div>
+    </div>
   </div>
+</div>
 </div>
 
 <!-- Add Modal -->
@@ -289,10 +383,8 @@ body{font-family:var(--font);background:var(--surface);color:var(--text);min-hei
       </div>
       <input type="file" id="csvFile" accept=".csv" style="display:none" onchange="handleFile(event)">
       <div style="text-align:center;margin-top:10px"><span class="csv-tmpl" onclick="dlTemplate()">Download CSV template</span></div>
-      <div style="margin-top:12px;padding:10px;background:var(--surface2);border-radius:var(--radius);font-size:12px;color:var(--text-soft)">Columns: <strong>name, dob, provider, service, phone, email, assignee, notes, status, apptDate, apptTime, completedDate, completedTime</strong></div>
     </div>
     <div id="itab-paste-panel" style="display:none">
-      <div class="flabel" style="margin-bottom:6px">Paste rows from Excel or Google Sheets</div>
       <textarea class="paste-ta" id="pasteInput" oninput="parsePaste()" placeholder="name, dob, provider, service, phone, email, assignee&#10;John Smith, 1980-01-15, Dr. Lee..."></textarea>
     </div>
     <div class="imp-preview" id="impPreview">
@@ -307,82 +399,157 @@ body{font-family:var(--font);background:var(--surface);color:var(--text);min-hei
 <div class="toast" id="toast"></div>
 
 <script>
-var BASE_URL = window.location.origin;
-var POLL = 30000;
+// ── SUPABASE INIT ──
+var SUPA_URL = 'https://bzazrpimlzapsxqpjybk.supabase.co';
+var SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ6YXpycGltbHphcHN4cXBqeWJrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NTA2NjAsImV4cCI6MjA5MTQyNjY2MH0.IJulb6ICODeGRlmQsf4UkrqI_wz7FjQQrEu3PjSRQko';
+var sb = supabase.createClient(SUPA_URL, SUPA_KEY);
+
 var patients = [];
 var filter = 'all';
 var openId = null;
 var impRows = [];
 var selProv = 'all';
+var currentUser = null;
+var currentProfile = null;
 
-var PAL = [['#e0faf5','#009e82'],['#f3f0ff','#5a3eb5'],['#fff8eb','#b97c0a'],['#fef2f1','#c0392b'],['#e8f5e9','#2e7d32'],['#e3f2fd','#1565c0'],['#fce7f3','#9d174d'],['#fff7ed','#c2410c']];
-var PCOL = ['#00c5a1','#7c5cbf','#f5a623','#3b82f6','#e8453c','#2ecc71','#e879f9','#f97316'];
+var PAL=[['#e0faf5','#009e82'],['#f3f0ff','#5a3eb5'],['#fff8eb','#b97c0a'],['#fef2f1','#c0392b'],['#e8f5e9','#2e7d32'],['#e3f2fd','#1565c0'],['#fce7f3','#9d174d'],['#fff7ed','#c2410c']];
+var PCOL=['#00c5a1','#7c5cbf','#f5a623','#3b82f6','#e8453c','#2ecc71','#e879f9','#f97316'];
 function pal(id){var h=id?[...id].reduce(function(a,c){return a+c.charCodeAt(0)},0):0;return PAL[h%PAL.length]}
 function ini(n){return(n||'?').split(' ').map(function(w){return w[0]}).join('').slice(0,2).toUpperCase()}
 function pcol(n){var h=[...n].reduce(function(a,c){return a+c.charCodeAt(0)},0);return PCOL[h%PCOL.length]}
-function assignee(p){if(p.assignee&&p.assignee.trim())return p.assignee.trim();if(p.notes){var m=p.notes.match(/Assigned to:\s*([^|]+)/i);if(m)return m[1].trim()}return''}
+function assignee(p){if(p.assignee&&p.assignee.trim())return p.assignee.trim();return''}
 
-// API
-function loadPatients(){
-  var xhr=new XMLHttpRequest();
-  xhr.open('GET',BASE_URL+'/api/patients');
-  xhr.onload=function(){
-    if(xhr.status===200){
-      var data=JSON.parse(xhr.responseText);
-      if(Array.isArray(data)){patients=data;renderAll();renderMetrics()}
-    }
-  };
-  xhr.onerror=function(){if(!patients.length)loadDemo()};
-  xhr.send();
+// ── AUTH ──
+async function doLogin(){
+  var email=document.getElementById('loginEmail').value.trim();
+  var pass=document.getElementById('loginPass').value;
+  var err=document.getElementById('loginErr');
+  var btn=document.getElementById('loginBtn');
+  if(!email||!pass){showErr('Please enter your email and password.');return}
+  btn.textContent='Signing in...';btn.disabled=true;err.classList.remove('show');
+  var res=await sb.auth.signInWithPassword({email,password:pass});
+  if(res.error){showErr(res.error.message);btn.textContent='Sign In';btn.disabled=false;return}
+  currentUser=res.data.user;
+  await loadProfile();
 }
 
-function apiPatch(id,data){
-  var xhr=new XMLHttpRequest();
-  xhr.open('PATCH',BASE_URL+'/api/patients/'+id);
-  xhr.setRequestHeader('Content-Type','application/json');
-  xhr.send(JSON.stringify(data));
+function showErr(msg){var e=document.getElementById('loginErr');e.textContent=msg;e.classList.add('show')}
+
+async function loadProfile(){
+  var res=await sb.from('bmh_users').select('*').eq('id',currentUser.id).single();
+  if(res.error||!res.data){showErr('No BMH user profile found. Contact your administrator.');await sb.auth.signOut();document.getElementById('loginBtn').textContent='Sign In';document.getElementById('loginBtn').disabled=false;return}
+  currentProfile=res.data;
+  await logAccess('login','--');
+  showApp();
 }
 
-function apiPost(data,cb){
-  var xhr=new XMLHttpRequest();
-  xhr.open('POST',BASE_URL+'/api/patients');
-  xhr.setRequestHeader('Content-Type','application/json');
-  xhr.onload=function(){if(xhr.status===201&&cb)cb(JSON.parse(xhr.responseText))};
-  xhr.send(JSON.stringify(data));
+async function doLogout(){
+  if(currentProfile)await logAccess('logout','--');
+  await sb.auth.signOut();
+  currentUser=null;currentProfile=null;patients=[];
+  document.getElementById('appWrap').classList.remove('visible');
+  document.getElementById('loginWrap').style.display='flex';
+  document.getElementById('loginEmail').value='';
+  document.getElementById('loginPass').value='';
+  document.getElementById('loginBtn').textContent='Sign In';
+  document.getElementById('loginBtn').disabled=false;
+  document.getElementById('loginErr').classList.remove('show');
 }
 
-function apiDelete(id){
-  var xhr=new XMLHttpRequest();
-  xhr.open('DELETE',BASE_URL+'/api/patients/'+id);
-  xhr.send();
+function showApp(){
+  document.getElementById('loginWrap').style.display='none';
+  document.getElementById('appWrap').classList.add('visible');
+  // Set user info in topbar
+  var n=currentProfile.full_name||currentUser.email;
+  document.getElementById('topName').textContent=n;
+  document.getElementById('topBmhId').textContent=currentProfile.bmh_id||'';
+  document.getElementById('topAvatar').textContent=ini(n);
+  var rb=document.getElementById('topRoleBadge');
+  rb.textContent=currentProfile.role;
+  rb.className='role-badge role-'+currentProfile.role;
+  // Role-based UI
+  var isAdmin=currentProfile.role==='admin';
+  var isCompliance=currentProfile.role==='compliance';
+  var canWrite=isAdmin||currentProfile.role==='phlebotomist';
+  if(!canWrite){document.getElementById('addPatientBtn').style.display='none';document.getElementById('importBtn').style.display='none';document.getElementById('sideImport').style.display='none'}
+  if(isAdmin||isCompliance){document.getElementById('sideLogLink').style.display='flex';document.getElementById('btn-log').style.display='block'}
+  loadPatients();
 }
 
-function testWebhook(){
-  var xhr=new XMLHttpRequest();
-  xhr.open('GET',BASE_URL+'/webhook/test');
-  xhr.onload=function(){loadPatients();toast('Test patient injected')};
-  xhr.send();
+// ── ACCESS LOG ──
+async function logAccess(action,recordId){
+  if(!currentProfile)return;
+  await sb.from('access_log').insert({
+    bmh_id:currentProfile.bmh_id,
+    user_email:currentUser.email,
+    action:action,
+    record_id:String(recordId),
+    ip_address:'client',
+    user_agent:navigator.userAgent.slice(0,120)
+  });
 }
 
-function loadDemo(){
-  patients=[
-    {id:'d1',source:'ghl_webhook',name:'Marcus Allen',dob:'1978-04-12',provider:'Dr. Kim / MGH',service:'CBC',phone:'617-555-0101',email:'',orderDate:'2026-03-28',status:'completed',apptDate:'2026-04-01',apptTime:'10:30',completedDate:'2026-04-01',completedTime:'10:47',assignee:'Dara Chase',incompleteReason:'',unreachableReason:'',notes:'MRN: 1234567'},
-    {id:'d2',source:'ghl_webhook',name:'Denise Crawford',dob:'1985-09-03',provider:'Dr. Patel / BMC',service:'HbA1c',phone:'617-555-0202',email:'',orderDate:'2026-03-30',status:'scheduled',apptDate:'2026-04-05',apptTime:'09:00',completedDate:'',completedTime:'',assignee:'Chermaine Morson',incompleteReason:'',unreachableReason:'',notes:'Fasting required.'},
-    {id:'d3',source:'manual',name:'Jerome Washington',dob:'1962-11-20',provider:'Dr. Okafor',service:'PSA',phone:'202-555-0303',email:'',orderDate:'2026-04-01',status:'received',apptDate:'',apptTime:'',completedDate:'',completedTime:'',assignee:'Shari Bagnor',incompleteReason:'',unreachableReason:'',notes:''},
-  ];
+// ── DATA ──
+async function loadPatients(){
+  var res=await sb.from('patients').select('*').order('received_at',{ascending:false});
+  if(res.error){toast('Error loading patients: '+res.error.message);return}
+  patients=res.data||[];
   renderAll();renderMetrics();
 }
 
-// Views
+async function apiPatch(id,data){
+  var res=await sb.from('patients').update(data).eq('id',id);
+  if(res.error)toast('Update error: '+res.error.message);
+  await logAccess('update_patient',id);
+}
+
+async function apiPost(data,cb){
+  var res=await sb.from('patients').insert(data).select().single();
+  if(res.error){toast('Insert error: '+res.error.message);return}
+  await logAccess('add_patient',res.data.id);
+  if(cb)cb(res.data);
+}
+
+async function apiDelete(id){
+  var res=await sb.from('patients').delete().eq('id',id);
+  if(res.error){toast('Delete error: '+res.error.message);return}
+  await logAccess('delete_patient',id);
+}
+
+// ── VIEWS ──
 function switchView(v){
   document.querySelectorAll('.view').forEach(function(el){el.classList.remove('active')});
   document.getElementById('view-'+v).classList.add('active');
   document.querySelectorAll('.tab-btn').forEach(function(b){b.classList.remove('active')});
-  document.getElementById('btn-'+v).classList.add('active');
+  var btn=document.getElementById('btn-'+v);if(btn)btn.classList.add('active');
   if(v==='metrics')renderMetrics();
+  if(v==='log')renderLog();
 }
 
-// Render
+// ── ACCESS LOG VIEW ──
+async function renderLog(){
+  var wrap=document.getElementById('logTableWrap');
+  wrap.innerHTML='<div style="padding:20px;color:var(--text-soft)">Loading...</div>';
+  var res=await sb.from('access_log').select('*').order('created_at',{ascending:false}).limit(200);
+  if(res.error){wrap.innerHTML='<div style="padding:20px;color:var(--red)">Error: '+res.error.message+'</div>';return}
+  var rows=res.data||[];
+  if(!rows.length){wrap.innerHTML='<div class="empty"><div class="empty-icon">&#128196;</div><div class="empty-title">No access events yet</div></div>';return}
+  wrap.innerHTML='<table class="log-table"><thead><tr><th>BMH ID</th><th>User</th><th>Action</th><th>Record</th><th>Timestamp</th><th>User Agent</th></tr></thead><tbody>'+
+  rows.map(function(r){
+    return '<tr><td><strong>'+r.bmh_id+'</strong></td><td>'+r.user_email+'</td><td>'+r.action+'</td><td>'+(r.record_id||'--')+'</td><td>'+new Date(r.created_at).toLocaleString()+'</td><td style="font-size:11px;color:var(--text-soft);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(r.user_agent||'--')+'</td></tr>';
+  }).join('')+'</tbody></table>';
+}
+
+function exportLog(){
+  var table=document.querySelector('#logTableWrap table');
+  if(!table){toast('Load the log first');return}
+  var rows=[...table.querySelectorAll('tr')].map(function(r){return[...r.querySelectorAll('th,td')].map(function(c){return'"'+c.textContent.replace(/"/g,'""')+'"'}).join(',')});
+  var blob=new Blob([rows.join('\n')],{type:'text/csv'});
+  var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='BMH-AccessLog-'+new Date().toISOString().slice(0,10)+'.csv';a.click();
+  toast('Access log exported');
+}
+
+// ── RENDER ──
 function renderRate(){
   var total=patients.length;
   if(!total){document.getElementById('ratePct').textContent='0%';document.getElementById('rateTrack').innerHTML='';document.getElementById('rateLegend').innerHTML='';return}
@@ -405,7 +572,7 @@ function renderStats(){
     '<div class="stat-card"><div class="stat-label">Scheduled</div><div class="stat-val">'+c.scheduled+'</div></div>'+
     '<div class="stat-card"><div class="stat-label">Completed</div><div class="stat-val">'+c.completed+'</div></div>'+
     '<div class="stat-card"><div class="stat-label">Needs Attention</div><div class="stat-val">'+attn+'</div></div>'+
-    '<div class="stat-card"><div class="stat-label">Received Today</div><div class="stat-val">'+patients.filter(function(p){return p.orderDate===new Date().toISOString().slice(0,10)}).length+'</div></div>';
+    '<div class="stat-card"><div class="stat-label">Today</div><div class="stat-val">'+patients.filter(function(p){return(p.order_date||p.created_at||'').slice(0,10)===new Date().toISOString().slice(0,10)}).length+'</div></div>';
 }
 
 var BADGE={received:'sb-received',scheduled:'sb-scheduled',completed:'sb-completed',incomplete:'sb-incomplete',unreachable:'sb-unreachable'};
@@ -427,11 +594,11 @@ function getList(){
   var sort=document.getElementById('sortSelect').value;
   var list=patients.filter(function(p){
     if(filter!=='all'&&p.status!==filter)return false;
-    if(q&&![p.name,p.provider||'',p.service||'',p.phone||'',assignee(p),p.notes||''].join(' ').toLowerCase().includes(q))return false;
+    if(q&&![p.name,p.provider||'',p.service_type||'',p.phone||'',assignee(p),p.notes||''].join(' ').toLowerCase().includes(q))return false;
     return true;
   });
-  if(sort==='newest')list.sort(function(a,b){return new Date(b.receivedAt||b.orderDate)-new Date(a.receivedAt||a.orderDate)});
-  else if(sort==='oldest')list.sort(function(a,b){return new Date(a.receivedAt||a.orderDate)-new Date(b.receivedAt||b.orderDate)});
+  if(sort==='newest')list.sort(function(a,b){return new Date(b.received_at||b.created_at)-new Date(a.received_at||a.created_at)});
+  else if(sort==='oldest')list.sort(function(a,b){return new Date(a.received_at||a.created_at)-new Date(b.received_at||b.created_at)});
   else if(sort==='name')list.sort(function(a,b){return a.name.localeCompare(b.name)});
   else if(sort==='status'){var O={received:0,scheduled:1,completed:2,incomplete:3,unreachable:4};list.sort(function(a,b){return(O[a.status]||0)-(O[b.status]||0)})}
   return list;
@@ -444,11 +611,11 @@ function renderList(){
   grid.innerHTML=list.map(function(p){
     var bg_fg=pal(p.id);var isOpen=openId===p.id;
     var a=assignee(p);
-    var sl={received:'Waiting to schedule',scheduled:'Appt: '+(p.apptDate||'TBD')+(p.apptTime?' @ '+p.apptTime:''),completed:'Done: '+(p.completedDate||''),incomplete:'Not completed',unreachable:'Unable to reach'}[p.status]||'';
+    var sl={received:'Waiting to schedule',scheduled:'Appt: '+(p.appt_date||'TBD')+(p.appt_time?' @ '+p.appt_time:''),completed:'Done: '+(p.completed_date||''),incomplete:'Not completed',unreachable:'Unable to reach'}[p.status]||'';
     return '<div class="pcard'+(isOpen?' open':'')+'" id="pc-'+p.id+'" onclick="toggleCard(\''+p.id+'\')">'+
       '<div class="pcard-top">'+
       '<div class="avatar" style="background:'+bg_fg[0]+';color:'+bg_fg[1]+'">'+ini(p.name)+'</div>'+
-      '<div class="pcard-info"><div class="pcard-name">'+p.name+'</div><div class="pcard-meta">'+(p.service||'--')+' &middot; '+(p.provider||'--')+(a?' &middot; <strong>'+a+'</strong>':'')+'</div></div>'+
+      '<div class="pcard-info"><div class="pcard-name">'+p.name+'</div><div class="pcard-meta">'+(p.service_type||'--')+' &middot; '+(p.provider||'--')+(a?' &middot; <strong>'+a+'</strong>':'')+'</div></div>'+
       '<div class="pcard-right">'+srcTag(p.source)+'<span class="sbadge '+(BADGE[p.status]||'sb-received')+'">'+(BLABEL[p.status]||p.status)+'</span><span class="chevron">&#9660;</span></div>'+
       '</div>'+
       '<div class="j-wrap"><div class="j-seg '+segCls(p.status,'received')+'"></div><div class="j-seg '+segCls(p.status,'scheduled')+'"></div><div class="j-seg '+segCls(p.status,'completed')+'"></div><span class="j-label">'+sl+'</span></div>'+
@@ -459,31 +626,30 @@ function renderList(){
 
 function detailHTML(p){
   var a=assignee(p);
+  var canEdit=currentProfile&&(currentProfile.role==='admin'||(currentProfile.role==='phlebotomist'&&a===currentProfile.full_name));
   return '<div class="detail-inner">'+
     '<div class="dsec"><div class="dsec-title">Patient Info</div>'+
     '<div class="drow"><span class="drow-label">DOB</span><span class="drow-val">'+(p.dob||'--')+'</span></div>'+
     '<div class="drow"><span class="drow-label">Phone</span><span class="drow-val">'+(p.phone||'--')+'</span></div>'+
     '<div class="drow"><span class="drow-label">Provider</span><span class="drow-val">'+(p.provider||'--')+'</span></div>'+
     '<div class="drow"><span class="drow-label">Assigned To</span><span class="drow-val">'+(a||'--')+'</span></div>'+
-    '<div class="drow"><span class="drow-label">Order Date</span><span class="drow-val">'+(p.orderDate||'--')+'</span></div></div>'+
+    '<div class="drow"><span class="drow-label">MRN</span><span class="drow-val">'+(p.mrn||'--')+'</span></div></div>'+
     '<div class="dsec"><div class="dsec-title">Journey Timeline</div><div class="tl">'+
-    '<div class="tl-row"><div class="tl-dot done">&#10003;</div><div class="tl-info"><div class="tl-name">Order Received</div><div class="tl-date">'+(p.orderDate||'--')+'</div></div></div>'+
-    '<div class="tl-row"><div class="tl-dot '+(p.apptDate?'done':p.status==='incomplete'?'warn':'pending')+'">'+(p.apptDate?'&#10003;':p.status==='incomplete'?'!':'&#9711;')+'</div><div class="tl-info"><div class="tl-name">Appointment</div><div class="tl-date">'+(p.apptDate?p.apptDate+(p.apptTime?' @ '+p.apptTime:''):'Not scheduled')+'</div></div></div>'+
-    '<div class="tl-row"><div class="tl-dot '+(p.status==='completed'?'done':p.status==='incomplete'?'warn':p.status==='unreachable'?'danger':'pending')+'">'+(p.status==='completed'?'&#10003;':p.status==='incomplete'?'!':p.status==='unreachable'?'&#10007;':'&#9711;')+'</div><div class="tl-info"><div class="tl-name">'+(p.status==='completed'?'Completed':p.status==='incomplete'?'Not Completed':p.status==='unreachable'?'Unable to Reach':'Pending')+'</div><div class="tl-date">'+(p.status==='completed'&&p.completedDate?p.completedDate+(p.completedTime?' @ '+p.completedTime:''):p.incompleteReason||p.unreachableReason||'--')+'</div></div></div>'+
+    '<div class="tl-row"><div class="tl-dot done">&#10003;</div><div class="tl-info"><div class="tl-name">Order Received</div><div class="tl-date">'+(p.order_date||p.created_at||'--').slice(0,10)+'</div></div></div>'+
+    '<div class="tl-row"><div class="tl-dot '+(p.appt_date?'done':p.status==='incomplete'?'warn':'pending')+'">'+(p.appt_date?'&#10003;':p.status==='incomplete'?'!':'&#9711;')+'</div><div class="tl-info"><div class="tl-name">Appointment</div><div class="tl-date">'+(p.appt_date?p.appt_date+(p.appt_time?' @ '+p.appt_time:''):'Not scheduled')+'</div></div></div>'+
+    '<div class="tl-row"><div class="tl-dot '+(p.status==='completed'?'done':p.status==='incomplete'?'warn':p.status==='unreachable'?'danger':'pending')+'">'+(p.status==='completed'?'&#10003;':p.status==='incomplete'?'!':p.status==='unreachable'?'&#10007;':'&#9711;')+'</div><div class="tl-info"><div class="tl-name">'+(p.status==='completed'?'Completed':p.status==='incomplete'?'Not Completed':p.status==='unreachable'?'Unable to Reach':'Pending')+'</div><div class="tl-date">'+(p.status==='completed'&&p.completed_date?p.completed_date+(p.completed_time?' @ '+p.completed_time:''):p.incomplete_reason||p.unreachable_reason||'--')+'</div></div></div>'+
     '</div></div>'+
-    '<div class="dsec full"><div class="dsec-title">Update Status</div><div class="urow" id="ur-'+p.id+'">'+buildUrow(p)+'</div></div>'+
-    '<div class="dsec full"><div class="dsec-title">Notes</div>'+
-    '<textarea class="notes-ta" id="nt-'+p.id+'">'+(p.notes||'')+'</textarea>'+
-    '<div class="notes-row"><button class="save-btn" onclick="saveNotes(\''+p.id+'\')">Save Notes</button></div></div>'+
+    (canEdit?'<div class="dsec full"><div class="dsec-title">Update Status</div><div class="urow" id="ur-'+p.id+'">'+buildUrow(p)+'</div></div>':'')+
+    (canEdit?'<div class="dsec full"><div class="dsec-title">Notes</div><textarea class="notes-ta" id="nt-'+p.id+'">'+(p.notes||'')+'</textarea><div class="notes-row"><button class="save-btn" onclick="saveNotes(\''+p.id+'\')">Save Notes</button></div></div>':'')+
     '</div>';
 }
 
 function buildUrow(p){
   var s=p.status,ex='';
-  if(s==='scheduled')ex='<input class="cinp" type="date" id="ua-'+p.id+'" value="'+(p.apptDate||'')+'"><input class="cinp" type="time" id="ub-'+p.id+'" value="'+(p.apptTime||'')+'">';
-  if(s==='completed')ex='<input class="cinp" type="date" id="ua-'+p.id+'" value="'+(p.completedDate||'')+'"><input class="cinp" type="time" id="ub-'+p.id+'" value="'+(p.completedTime||'')+'">';
-  if(s==='incomplete')ex='<input class="cinp" id="ua-'+p.id+'" value="'+(p.incompleteReason||'')+'" placeholder="Reason" style="flex:1;min-width:160px">';
-  if(s==='unreachable')ex='<input class="cinp" id="ua-'+p.id+'" value="'+(p.unreachableReason||'')+'" placeholder="Reason" style="flex:1;min-width:160px">';
+  if(s==='scheduled')ex='<input class="cinp" type="date" id="ua-'+p.id+'" value="'+(p.appt_date||'')+'"><input class="cinp" type="time" id="ub-'+p.id+'" value="'+(p.appt_time||'')+'">';
+  if(s==='completed')ex='<input class="cinp" type="date" id="ua-'+p.id+'" value="'+(p.completed_date||'')+'"><input class="cinp" type="time" id="ub-'+p.id+'" value="'+(p.completed_time||'')+'">';
+  if(s==='incomplete')ex='<input class="cinp" id="ua-'+p.id+'" value="'+(p.incomplete_reason||'')+'" placeholder="Reason" style="flex:1;min-width:160px">';
+  if(s==='unreachable')ex='<input class="cinp" id="ua-'+p.id+'" value="'+(p.unreachable_reason||'')+'" placeholder="Reason" style="flex:1;min-width:160px">';
   return '<select class="csel" id="us-'+p.id+'" onchange="refreshUrow(\''+p.id+'\')">'+
     '<option value="received"'+(s==='received'?' selected':'')+'>Order Received</option>'+
     '<option value="scheduled"'+(s==='scheduled'?' selected':'')+'>Appt Scheduled</option>'+
@@ -492,49 +658,53 @@ function buildUrow(p){
     '<option value="unreachable"'+(s==='unreachable'?' selected':'')+'>Unable to Reach</option>'+
     '</select><div id="ue-'+p.id+'" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">'+ex+'</div>'+
     '<button class="save-btn" onclick="saveStatus(\''+p.id+'\')">Save</button>'+
-    '<button class="del-btn" onclick="confirmDel(\''+p.id+'\')">Remove</button>';
+    (currentProfile&&currentProfile.role==='admin'?'<button class="del-btn" onclick="confirmDel(\''+p.id+'\')">Remove</button>':'');
 }
 
 function refreshUrow(id){
   var s=document.getElementById('us-'+id).value;
   var p=patients.find(function(x){return x.id===id})||{};
   var ex='';
-  if(s==='scheduled')ex='<input class="cinp" type="date" id="ua-'+id+'" value="'+(p.apptDate||'')+'"><input class="cinp" type="time" id="ub-'+id+'" value="'+(p.apptTime||'')+'">';
-  if(s==='completed')ex='<input class="cinp" type="date" id="ua-'+id+'" value="'+(p.completedDate||'')+'"><input class="cinp" type="time" id="ub-'+id+'" value="'+(p.completedTime||'')+'">';
-  if(s==='incomplete')ex='<input class="cinp" id="ua-'+id+'" value="'+(p.incompleteReason||'')+'" placeholder="Reason" style="flex:1;min-width:160px">';
-  if(s==='unreachable')ex='<input class="cinp" id="ua-'+id+'" value="'+(p.unreachableReason||'')+'" placeholder="Reason" style="flex:1;min-width:160px">';
+  if(s==='scheduled')ex='<input class="cinp" type="date" id="ua-'+id+'" value="'+(p.appt_date||'')+'"><input class="cinp" type="time" id="ub-'+id+'" value="'+(p.appt_time||'')+'">';
+  if(s==='completed')ex='<input class="cinp" type="date" id="ua-'+id+'" value="'+(p.completed_date||'')+'"><input class="cinp" type="time" id="ub-'+id+'" value="'+(p.completed_time||'')+'">';
+  if(s==='incomplete')ex='<input class="cinp" id="ua-'+id+'" value="'+(p.incomplete_reason||'')+'" placeholder="Reason" style="flex:1;min-width:160px">';
+  if(s==='unreachable')ex='<input class="cinp" id="ua-'+id+'" value="'+(p.unreachable_reason||'')+'" placeholder="Reason" style="flex:1;min-width:160px">';
   document.getElementById('ue-'+id).innerHTML=ex;
 }
 
-function saveStatus(id){
+async function saveStatus(id){
   var p=patients.find(function(x){return x.id===id});if(!p)return;
   var s=document.getElementById('us-'+id).value;
   var ua=(document.getElementById('ua-'+id)||{}).value||'';
   var ub=(document.getElementById('ub-'+id)||{}).value||'';
-  var upd={status:s};
-  if(s==='scheduled'){upd.apptDate=ua;upd.apptTime=ub}
-  if(s==='completed'){upd.completedDate=ua;upd.completedTime=ub}
-  if(s==='incomplete')upd.incompleteReason=ua;
-  if(s==='unreachable')upd.unreachableReason=ua;
-  Object.assign(p,upd);apiPatch(id,upd);
+  var upd={status:s,updated_at:new Date().toISOString()};
+  if(s==='scheduled'){upd.appt_date=ua;upd.appt_time=ub}
+  if(s==='completed'){upd.completed_date=ua;upd.completed_time=ub}
+  if(s==='incomplete')upd.incomplete_reason=ua;
+  if(s==='unreachable')upd.unreachable_reason=ua;
+  Object.assign(p,upd);await apiPatch(id,upd);
   renderAll();renderMetrics();openId=id;renderList();toast('Status updated');
 }
 
-function saveNotes(id){
+async function saveNotes(id){
   var val=(document.getElementById('nt-'+id)||{}).value||'';
   var p=patients.find(function(x){return x.id===id});if(p)p.notes=val;
-  apiPatch(id,{notes:val});toast('Notes saved');
+  await apiPatch(id,{notes:val});toast('Notes saved');
 }
 
-function confirmDel(id){
-  if(confirm('Remove this patient?')){apiDelete(id);patients=patients.filter(function(p){return p.id!==id});renderAll();renderMetrics();toast('Removed');}
+async function confirmDel(id){
+  if(confirm('Remove this patient?')){await apiDelete(id);patients=patients.filter(function(p){return p.id!==id});renderAll();renderMetrics();toast('Removed');}
 }
 
 function renderAll(){renderStats();renderRate();renderList()}
 
-function toggleCard(id){
+async function toggleCard(id){
   openId=openId===id?null:id;renderList();
-  if(openId){var el=document.getElementById('pc-'+id);if(el)setTimeout(function(){el.scrollIntoView({behavior:'smooth',block:'nearest'})},100)}
+  if(openId){
+    await logAccess('view_patient',id);
+    var el=document.getElementById('pc-'+id);
+    if(el)setTimeout(function(){el.scrollIntoView({behavior:'smooth',block:'nearest'})},100)
+  }
 }
 
 function setFilter(f,el){
@@ -544,7 +714,7 @@ function setFilter(f,el){
   renderList();
 }
 
-// Metrics
+// ── METRICS ──
 function renderMetrics(){
   var total=patients.length;
   var c={completed:0,scheduled:0,received:0,incomplete:0,unreachable:0};
@@ -564,21 +734,14 @@ function renderMetrics(){
 function renderDonut(c,total){
   var segs=[{k:'completed',col:'#00c5a1',l:'Completed'},{k:'scheduled',col:'#7c5cbf',l:'Scheduled'},{k:'received',col:'#8896ab',l:'Received'},{k:'incomplete',col:'#f5a623',l:'Not Completed'},{k:'unreachable',col:'#e8453c',l:'Unable to Reach'}];
   var cx=60,cy=60,r=46,sw=16,circ=2*Math.PI*r,offset=0,paths='';
-  segs.forEach(function(s){
-    var val=c[s.k]||0,pct=total?val/total:0,dash=pct*circ;
-    if(dash>0){paths+='<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="none" stroke="'+s.col+'" stroke-width="'+sw+'" stroke-dasharray="'+dash+' '+(circ-dash)+'" stroke-dashoffset="'+(-offset*circ)+'" transform="rotate(-90 '+cx+' '+cy+')"/>';offset+=pct}
-  });
+  segs.forEach(function(s){var val=c[s.k]||0,pct=total?val/total:0,dash=pct*circ;if(dash>0){paths+='<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="none" stroke="'+s.col+'" stroke-width="'+sw+'" stroke-dasharray="'+dash+' '+(circ-dash)+'" stroke-dashoffset="'+(-offset*circ)+'" transform="rotate(-90 '+cx+' '+cy+')"/>';offset+=pct}});
   document.getElementById('donutSvg').innerHTML=paths+'<text x="60" y="56" text-anchor="middle" font-size="16" font-weight="700" fill="#0d1b2e">'+(total?Math.round(c.completed/total*100):0)+'%</text><text x="60" y="70" text-anchor="middle" font-size="9" fill="#8896ab">COMPLETE</text>';
   document.getElementById('donutLegend').innerHTML=segs.filter(function(s){return c[s.k]>0}).map(function(s){return'<div class="donut-legend-row"><div class="donut-legend-left"><div class="donut-legend-dot" style="background:'+s.col+'"></div><span>'+s.l+'</span></div><span class="donut-legend-pct">'+(c[s.k]||0)+' ('+(total?Math.round((c[s.k]||0)/total*100):0)+'%)</span></div>'}).join('');
 }
 
 function renderLB(){
   var pm={};
-  patients.forEach(function(p){
-    var a=assignee(p)||'Unassigned';
-    if(!pm[a])pm[a]={name:a,completed:0,scheduled:0,received:0,incomplete:0,unreachable:0,total:0};
-    pm[a][p.status]=(pm[a][p.status]||0)+1;pm[a].total++;
-  });
+  patients.forEach(function(p){var a=assignee(p)||'Unassigned';if(!pm[a])pm[a]={name:a,completed:0,scheduled:0,received:0,incomplete:0,unreachable:0,total:0};pm[a][p.status]=(pm[a][p.status]||0)+1;pm[a].total++});
   var provs=Object.values(pm).sort(function(a,b){return b.completed-a.completed});
   var maxC=provs.length?provs[0].completed:1;
   var allP=['all'].concat(provs.map(function(p){return p.name}));
@@ -586,72 +749,52 @@ function renderLB(){
   var filt=selProv==='all'?provs:provs.filter(function(p){return p.name===selProv});
   var medals=['&#129351;','&#129352;','&#129353;'];
   document.getElementById('leaderboard').innerHTML=filt.length?filt.map(function(p,i){
-    var col=pcol(p.name);
-    var bw=maxC?Math.round(p.completed/maxC*100):0;
-    var cp=p.total?Math.round(p.completed/p.total*100):0;
-    return '<div class="lb-row">'+
-      '<div class="lb-rank">'+(i<3?medals[i]:'#'+(i+1))+'</div>'+
-      '<div class="lb-avatar" style="background:'+col+'22;color:'+col+'">'+ini(p.name)+'</div>'+
-      '<div class="lb-info"><div class="lb-name">'+p.name+' <span style="font-size:11px;color:var(--text-soft);font-weight:400">'+cp+'% completion</span></div>'+
-      '<div class="lb-bar-wrap"><div class="lb-bar-track"><div class="lb-bar-fill" style="width:'+bw+'%;background:'+col+'"></div></div></div></div>'+
-      '<div class="lb-stats">'+
-      '<div class="lb-stat"><div class="lb-stat-val" style="color:var(--teal)">'+p.completed+'</div><div class="lb-stat-label">Done</div></div>'+
-      '<div class="lb-stat"><div class="lb-stat-val" style="color:var(--purple)">'+p.scheduled+'</div><div class="lb-stat-label">Sched</div></div>'+
-      '<div class="lb-stat"><div class="lb-stat-val" style="color:var(--amber)">'+(p.incomplete+p.unreachable)+'</div><div class="lb-stat-label">Issues</div></div>'+
-      '<div class="lb-stat"><div class="lb-stat-val">'+p.total+'</div><div class="lb-stat-label">Total</div></div>'+
-      '</div></div>';
+    var col=pcol(p.name);var bw=maxC?Math.round(p.completed/maxC*100):0;var cp=p.total?Math.round(p.completed/p.total*100):0;
+    return '<div class="lb-row"><div class="lb-rank">'+(i<3?medals[i]:'#'+(i+1))+'</div><div class="lb-avatar" style="background:'+col+'22;color:'+col+'">'+ini(p.name)+'</div><div class="lb-info"><div class="lb-name">'+p.name+' <span style="font-size:11px;color:var(--text-soft);font-weight:400">'+cp+'% completion</span></div><div class="lb-bar-wrap"><div class="lb-bar-track"><div class="lb-bar-fill" style="width:'+bw+'%;background:'+col+'"></div></div></div></div><div class="lb-stats"><div class="lb-stat"><div class="lb-stat-val" style="color:var(--teal)">'+p.completed+'</div><div class="lb-stat-label">Done</div></div><div class="lb-stat"><div class="lb-stat-val" style="color:var(--purple)">'+p.scheduled+'</div><div class="lb-stat-label">Sched</div></div><div class="lb-stat"><div class="lb-stat-val" style="color:var(--amber)">'+(p.incomplete+p.unreachable)+'</div><div class="lb-stat-label">Issues</div></div><div class="lb-stat"><div class="lb-stat-val">'+p.total+'</div><div class="lb-stat-label">Total</div></div></div></div>';
   }).join(''):'<div style="text-align:center;padding:24px;color:var(--text-soft)">No data yet.</div>';
 }
 
 function setProvFilter(n){selProv=n;renderLB()}
 
-// Add modal
+// ── ADD MODAL ──
 function openAdd(){document.getElementById('addOverlay').classList.add('open')}
 function closeAdd(){document.getElementById('addOverlay').classList.remove('open')}
 document.getElementById('addOverlay').addEventListener('click',function(e){if(e.target===this)closeAdd()});
 
-function submitAdd(){
+async function submitAdd(){
   var name=document.getElementById('f-name').value.trim();
   if(!name){alert('Name required');return}
-  var data={name:name,dob:document.getElementById('f-dob').value,provider:document.getElementById('f-provider').value,service:document.getElementById('f-service').value,phone:document.getElementById('f-phone').value,email:document.getElementById('f-email').value,assignee:document.getElementById('f-assignee').value,orderDate:document.getElementById('f-orderdate').value||new Date().toISOString().slice(0,10),notes:document.getElementById('f-notes').value,status:'received',apptDate:'',apptTime:'',completedDate:'',completedTime:'',incompleteReason:'',unreachableReason:'',source:'manual',receivedAt:new Date().toISOString()};
-  apiPost(data,function(p){patients.unshift(p);renderAll();renderMetrics();toast('Patient added')});
+  var data={name:name,dob:document.getElementById('f-dob').value,provider:document.getElementById('f-provider').value,service_type:document.getElementById('f-service').value,phone:document.getElementById('f-phone').value,email:document.getElementById('f-email').value,assignee:document.getElementById('f-assignee').value,order_date:document.getElementById('f-orderdate').value||new Date().toISOString().slice(0,10),notes:document.getElementById('f-notes').value,status:'received',appt_date:'',appt_time:'',completed_date:'',completed_time:'',incomplete_reason:'',unreachable_reason:'',source:'manual',received_at:new Date().toISOString()};
+  await apiPost(data,function(p){patients.unshift(p);renderAll();renderMetrics();toast('Patient added')});
   closeAdd();
   ['f-name','f-dob','f-provider','f-service','f-phone','f-email','f-assignee','f-orderdate','f-notes'].forEach(function(id){document.getElementById(id).value=''});
 }
 
-// Import
-var CSV_H=['name','dob','provider','service','phone','email','assignee','notes','status','apptDate','apptTime','completedDate','completedTime'];
-var CSV_A={'patient name':'name','full name':'name','date of birth':'dob','birthdate':'dob','ordering provider':'provider','doctor':'provider','test ordered':'service','phone number':'phone','email address':'email','assigned to':'assignee','intake notes':'notes'};
+// ── IMPORT ──
+var CSV_H=['name','dob','provider','service_type','phone','email','assignee','notes','status','appt_date','appt_time','completed_date','completed_time'];
+var CSV_A={'patient name':'name','full name':'name','date of birth':'dob','ordering provider':'provider','test ordered':'service_type','service':'service_type','phone number':'phone','email address':'email','assigned to':'assignee'};
 
 function openImport(){impRows=[];document.getElementById('impPreview').style.display='none';document.getElementById('impBtn').style.display='none';document.getElementById('dzLabel').textContent='Drop your CSV file here';document.getElementById('dzSub').textContent='or click to browse';document.getElementById('dropZone').classList.remove('file-chosen');document.getElementById('pasteInput').value='';document.getElementById('csvFile').value='';switchImpTab('csv');document.getElementById('impOverlay').classList.add('open')}
 function closeImport(){document.getElementById('impOverlay').classList.remove('open');impRows=[]}
 document.getElementById('impOverlay').addEventListener('click',function(e){if(e.target===this)closeImport()});
 
-function switchImpTab(t){
-  document.querySelectorAll('.imp-tab').forEach(function(b){b.classList.remove('active')});
-  document.getElementById('itab-'+t).classList.add('active');
-  document.getElementById('itab-csv-panel').style.display=t==='csv'?'block':'none';
-  document.getElementById('itab-paste-panel').style.display=t==='paste'?'block':'none';
-  impRows=[];document.getElementById('impPreview').style.display='none';document.getElementById('impBtn').style.display='none';
-}
+function switchImpTab(t){document.querySelectorAll('.imp-tab').forEach(function(b){b.classList.remove('active')});document.getElementById('itab-'+t).classList.add('active');document.getElementById('itab-csv-panel').style.display=t==='csv'?'block':'none';document.getElementById('itab-paste-panel').style.display=t==='paste'?'block':'none';impRows=[];document.getElementById('impPreview').style.display='none';document.getElementById('impBtn').style.display='none'}
 
 function parseCSV(text){
-  var lines=text.trim().split(/\r?\n/).filter(function(l){return l.trim()});
-  if(!lines.length)return[];
+  var lines=text.trim().split(/\r?\n/).filter(function(l){return l.trim()});if(!lines.length)return[];
   var delim=lines[0].includes('\t')?'\t':',';
   function split(line){var res=[],cur='',inQ=false;for(var i=0;i<line.length;i++){var c=line[i];if(c==='"'){inQ=!inQ}else if(c===delim&&!inQ){res.push(cur.trim());cur=''}else cur+=c}res.push(cur.trim());return res}
   var rawH=split(lines[0]).map(function(h){return h.toLowerCase().replace(/['"]/g,'').trim()});
-  var isH=rawH.some(function(h){return CSV_A[h]||CSV_H.includes(h)||h==='name'||h==='patient'});
+  var isH=rawH.some(function(h){return CSV_A[h]||CSV_H.includes(h)||h==='name'});
   var hrow=isH?rawH.map(function(h){return CSV_A[h]||h}):CSV_H;
   var dlines=isH?lines.slice(1):lines;
   return dlines.map(function(line){var vals=split(line),row={};hrow.forEach(function(h,i){if(CSV_H.includes(h))row[h]=(vals[i]||'').replace(/^"|"$/g,'').trim()});if(!row.name)row.name=vals[0]||'';return row}).filter(function(r){return r.name});
 }
 
 function showPreview(rows){
-  impRows=rows;
-  if(!rows.length){document.getElementById('impPreview').style.display='none';document.getElementById('impBtn').style.display='none';return}
+  impRows=rows;if(!rows.length){document.getElementById('impPreview').style.display='none';document.getElementById('impBtn').style.display='none';return}
   var cols=['name','dob','provider','assignee','phone','status'];
-  document.getElementById('prevTable').innerHTML='<thead><tr>'+cols.map(function(c){return'<th>'+c+'</th>'}).join('')+'</tr></thead><tbody>'+rows.slice(0,5).map(function(r){return'<tr>'+cols.map(function(c){return'<td>'+(r[c]||'--')+'</td>'}).join('')+'</tr>'}).join('')+(rows.length>5?'<tr><td colspan="'+cols.length+'" style="text-align:center;color:var(--text-soft)">...and '+(rows.length-5)+' more</td></tr>':'')+'</tbody>';
+  document.getElementById('prevTable').innerHTML='<thead><tr>'+cols.map(function(c){return'<th>'+c+'</th>'}).join('')+'</tr></thead><tbody>'+rows.slice(0,5).map(function(r){return'<tr>'+cols.map(function(c){return'<td>'+(r[c]||'--')+'</td>'}).join('')+'</tr>'}).join('')+(rows.length>5?'<tr><td colspan="6" style="text-align:center;color:var(--text-soft)">...and '+(rows.length-5)+' more</td></tr>':'')+'</tbody>';
   document.getElementById('impSummary').innerHTML='<div class="imp-stat">Ready to import: <span>'+rows.length+'</span> patients</div>';
   document.getElementById('impPreview').style.display='block';document.getElementById('impBtn').style.display='block';
 }
@@ -660,32 +803,37 @@ function handleFile(e){var f=e.target.files[0];if(!f)return;var r=new FileReader
 function handleDrop(e){e.preventDefault();var f=e.dataTransfer.files[0];if(!f)return;var r=new FileReader();r.onload=function(ev){var rows=parseCSV(ev.target.result);document.getElementById('dzLabel').textContent=f.name;document.getElementById('dzSub').textContent=rows.length+' patients found';document.getElementById('dropZone').classList.add('file-chosen');showPreview(rows)};r.readAsText(f)}
 function parsePaste(){var t=document.getElementById('pasteInput').value;if(!t.trim()){impRows=[];document.getElementById('impPreview').style.display='none';document.getElementById('impBtn').style.display='none';return}showPreview(parseCSV(t))}
 
-function runImport(){
+async function runImport(){
   if(!impRows.length)return;
   var btn=document.getElementById('impBtn');btn.textContent='Importing...';btn.disabled=true;
   var valid=['received','scheduled','completed','incomplete','unreachable'];
   var done=0;
-  function next(i){
-    if(i>=impRows.length){closeImport();renderAll();renderMetrics();toast(done+' patient'+(done!==1?'s':'')+' imported');btn.textContent='Import Patients';btn.disabled=false;return}
+  for(var i=0;i<impRows.length;i++){
     var row=impRows[i];
-    var data={name:row.name,dob:row.dob||'',provider:row.provider||'',service:row.service||'',phone:row.phone||'',email:row.email||'',assignee:row.assignee||'',notes:row.notes||'',status:valid.includes(row.status)?row.status:'received',apptDate:row.apptDate||'',apptTime:row.apptTime||'',completedDate:row.completedDate||'',completedTime:row.completedTime||'',incompleteReason:'',unreachableReason:'',source:'csv_import',orderDate:new Date().toISOString().slice(0,10),receivedAt:new Date().toISOString()};
-    apiPost(data,function(p){patients.unshift(p);done++;next(i+1)});
+    var data={name:row.name,dob:row.dob||'',provider:row.provider||'',service_type:row.service_type||'',phone:row.phone||'',email:row.email||'',assignee:row.assignee||'',notes:row.notes||'',status:valid.includes(row.status)?row.status:'received',appt_date:row.appt_date||'',appt_time:row.appt_time||'',completed_date:row.completed_date||'',completed_time:row.completed_time||'',incomplete_reason:'',unreachable_reason:'',source:'csv_import',order_date:new Date().toISOString().slice(0,10),received_at:new Date().toISOString()};
+    await apiPost(data,function(p){patients.unshift(p);done++});
   }
-  next(0);
+  closeImport();renderAll();renderMetrics();toast(done+' patient'+(done!==1?'s':'')+' imported');btn.textContent='Import Patients';btn.disabled=false;
+  await logAccess('bulk_import',done+' patients');
 }
 
 function dlTemplate(){
-  var b=new Blob(['name,dob,provider,service,phone,email,assignee,notes,status,apptDate,apptTime,completedDate,completedTime\nJohn Smith,1980-01-15,Dr. Lee / BMC,CBC,617-555-0101,j@email.com,Dara Chase,Fasting required,scheduled,2026-04-05,09:00,,'],{type:'text/csv'});
+  var b=new Blob(['name,dob,provider,service_type,phone,email,assignee,notes,status,appt_date,appt_time,completed_date,completed_time\nJohn Smith,1980-01-15,Dr. Lee / BMC,CBC,617-555-0101,j@email.com,Dara Chase,Fasting required,scheduled,2026-04-05,09:00,,'],{type:'text/csv'});
   var a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='bmh-import-template.csv';a.click();
 }
 
-// Toast
+// ── TOAST ──
 var toastTimer;
 function toast(msg){var el=document.getElementById('toast');el.textContent=msg;el.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(function(){el.classList.remove('show')},2800)}
 
-// Init
-window.onload=function(){loadPatients()};
-setInterval(loadPatients,POLL);
+// ── INIT ──
+window.onload=async function(){
+  var sess=await sb.auth.getSession();
+  if(sess.data.session){currentUser=sess.data.session.user;await loadProfile()}
+};
+sb.auth.onAuthStateChange(function(event,session){
+  if(event==='SIGNED_OUT'){currentUser=null;currentProfile=null}
+});
 </script>
 </body>
 </html>
