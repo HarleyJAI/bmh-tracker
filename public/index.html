@@ -291,11 +291,11 @@ body{font-family:var(--font);background:var(--surface);color:var(--text);min-hei
     <div class="sidebar-section">
       <div class="sidebar-label">Filter by Status</div>
       <div class="nav-item active" onclick="setFilter('all',this)"><span><span class="nav-dot" style="background:#8896ab"></span>All Patients</span><span class="nav-count" id="cnt-all">0</span></div>
-      <div class="nav-item" onclick="setFilter('received',this)"><span><span class="nav-dot" style="background:#8896ab"></span>Order Received</span><span class="nav-count" id="cnt-received">0</span></div>
-      <div class="nav-item" onclick="setFilter('scheduled',this)"><span><span class="nav-dot" style="background:#7c5cbf"></span>Appt Scheduled</span><span class="nav-count" id="cnt-scheduled">0</span></div>
-      <div class="nav-item" onclick="setFilter('completed',this)"><span><span class="nav-dot" style="background:#2ecc71"></span>Completed</span><span class="nav-count" id="cnt-completed">0</span></div>
-      <div class="nav-item" onclick="setFilter('incomplete',this)"><span><span class="nav-dot" style="background:#f5a623"></span>Not Completed</span><span class="nav-count" id="cnt-incomplete">0</span></div>
-      <div class="nav-item" onclick="setFilter('unreachable',this)"><span><span class="nav-dot" style="background:#e8453c"></span>Unable to Reach</span><span class="nav-count" id="cnt-unreachable">0</span></div>
+      <div class="nav-item" onclick="setFilter('Order Received',this)"><span><span class="nav-dot" style="background:#8896ab"></span>Order Received</span><span class="nav-count" id="cnt-received">0</span></div>
+      <div class="nav-item" onclick="setFilter('Appt Scheduled',this)"><span><span class="nav-dot" style="background:#7c5cbf"></span>Appt Scheduled</span><span class="nav-count" id="cnt-scheduled">0</span></div>
+      <div class="nav-item" onclick="setFilter('Completed',this)"><span><span class="nav-dot" style="background:#2ecc71"></span>Completed</span><span class="nav-count" id="cnt-completed">0</span></div>
+      <div class="nav-item" onclick="setFilter('Not Completed',this)"><span><span class="nav-dot" style="background:#f5a623"></span>Not Completed</span><span class="nav-count" id="cnt-incomplete">0</span></div>
+      <div class="nav-item" onclick="setFilter('Unable to Reach',this)"><span><span class="nav-dot" style="background:#e8453c"></span>Unable to Reach</span><span class="nav-count" id="cnt-unreachable">0</span></div>
     </div>
     <div class="sidebar-section">
       <div class="sidebar-label">Tools</div>
@@ -553,41 +553,53 @@ function exportLog(){
 function renderRate(){
   var total=patients.length;
   if(!total){document.getElementById('ratePct').textContent='0%';document.getElementById('rateTrack').innerHTML='';document.getElementById('rateLegend').innerHTML='';return}
-  var c={completed:0,scheduled:0,received:0,incomplete:0,unreachable:0};
+  var c={'Completed':0,'Appt Scheduled':0,'Order Received':0,'Not Completed':0,'Unable to Reach':0};
   patients.forEach(function(p){c[p.status]=(c[p.status]||0)+1});
-  var pct=Math.round(c.completed/total*100);
+  var pct=Math.round((c['Completed']||0)/total*100);
   document.getElementById('ratePct').textContent=pct+'%';
-  var segs=[{k:'completed',col:'#00c5a1',l:'Completed'},{k:'scheduled',col:'#7c5cbf',l:'Scheduled'},{k:'received',col:'#8896ab',l:'Received'},{k:'incomplete',col:'#f5a623',l:'Not Completed'},{k:'unreachable',col:'#e8453c',l:'Unable to Reach'}];
+  var segs=[{k:'Completed',col:'#00c5a1',l:'Completed'},{k:'Appt Scheduled',col:'#7c5cbf',l:'Scheduled'},{k:'Order Received',col:'#8896ab',l:'Received'},{k:'Not Completed',col:'#f5a623',l:'Not Completed'},{k:'Unable to Reach',col:'#e8453c',l:'Unable to Reach'}];
   document.getElementById('rateTrack').innerHTML=segs.map(function(s){return'<div style="width:'+Math.round((c[s.k]||0)/total*100)+'%;background:'+s.col+';height:100%"></div>'}).join('');
   document.getElementById('rateLegend').innerHTML=segs.map(function(s){return'<div class="rate-legend-item"><div class="rate-legend-dot" style="background:'+s.col+'"></div>'+s.l+': <span class="rate-legend-val">'+(c[s.k]||0)+' ('+Math.round((c[s.k]||0)/total*100)+'%)</span></div>'}).join('');
 }
 
 function renderStats(){
-  var c={all:patients.length,received:0,scheduled:0,completed:0,incomplete:0,unreachable:0};
+  var c={all:patients.length,'Order Received':0,'Appt Scheduled':0,'Completed':0,'Not Completed':0,'Unable to Reach':0};
   patients.forEach(function(p){c[p.status]=(c[p.status]||0)+1});
-  ['all','received','scheduled','completed','incomplete','unreachable'].forEach(function(k){var el=document.getElementById('cnt-'+k);if(el)el.textContent=c[k]||0});
-  var attn=(c.incomplete||0)+(c.unreachable||0);
+  document.getElementById('cnt-all').textContent=c.all||0;
+  document.getElementById('cnt-received').textContent=c['Order Received']||0;
+  document.getElementById('cnt-scheduled').textContent=c['Appt Scheduled']||0;
+  document.getElementById('cnt-completed').textContent=c['Completed']||0;
+  document.getElementById('cnt-incomplete').textContent=c['Not Completed']||0;
+  document.getElementById('cnt-unreachable').textContent=c['Unable to Reach']||0;
+  var attn=(c['Not Completed']||0)+(c['Unable to Reach']||0);
   document.getElementById('statsStrip').innerHTML=
     '<div class="stat-card hl"><div class="stat-label">Total Orders</div><div class="stat-val">'+c.all+'</div></div>'+
-    '<div class="stat-card"><div class="stat-label">Scheduled</div><div class="stat-val">'+c.scheduled+'</div></div>'+
-    '<div class="stat-card"><div class="stat-label">Completed</div><div class="stat-val">'+c.completed+'</div></div>'+
+    '<div class="stat-card"><div class="stat-label">Scheduled</div><div class="stat-val">'+(c['Appt Scheduled']||0)+'</div></div>'+
+    '<div class="stat-card"><div class="stat-label">Completed</div><div class="stat-val">'+(c['Completed']||0)+'</div></div>'+
     '<div class="stat-card"><div class="stat-label">Needs Attention</div><div class="stat-val">'+attn+'</div></div>'+
     '<div class="stat-card"><div class="stat-label">Today</div><div class="stat-val">'+patients.filter(function(p){return(p.order_date||p.created_at||'').slice(0,10)===new Date().toISOString().slice(0,10)}).length+'</div></div>';
 }
 
-var BADGE={received:'sb-received',scheduled:'sb-scheduled',completed:'sb-completed',incomplete:'sb-incomplete',unreachable:'sb-unreachable'};
-var BLABEL={received:'Order Received',scheduled:'Appt Scheduled',completed:'Completed',incomplete:'Not Completed',unreachable:'Unable to Reach'};
+var BADGE={'Order Received':'sb-received','Appt Scheduled':'sb-scheduled','Completed':'sb-completed','Not Completed':'sb-incomplete','Unable to Reach':'sb-unreachable'};
+var BLABEL={'Order Received':'Order Received','Appt Scheduled':'Appt Scheduled','Completed':'Completed','Not Completed':'Not Completed','Unable to Reach':'Unable to Reach'};
 
 function segCls(s,step){
-  var prog={received:1,scheduled:2,completed:3,incomplete:2,unreachable:1};
-  var steps={received:1,scheduled:2,completed:3};
-  var cur=prog[s]||1,sn=steps[step];
+  var prog={'Order Received':1,'Appt Scheduled':2,'Completed':3,'Not Completed':2,'Unable to Reach':1};
+  var steps={'Order Received':1,'Appt Scheduled':2,'Completed':3};
+  var cur=prog[s]||1,sn=steps[step]||0;
   if(sn<cur)return'done';
-  if(sn===cur){if(s==='completed')return'done';if(s==='scheduled')return'sched';if(s==='incomplete')return'warn';if(s==='unreachable')return'danger';return'done'}
+  if(sn===cur){if(s==='Completed')return'done';if(s==='Appt Scheduled')return'sched';if(s==='Not Completed')return'warn';if(s==='Unable to Reach')return'danger';return'done'}
   return'';
 }
 
 function srcTag(s){if(s==='ghl_webhook')return'<span class="src-tag ghl">GHL</span>';if(s==='csv_import'||s==='csv')return'<span class="src-tag csv">CSV</span>';return'<span class="src-tag">Manual</span>'}
+
+function setFilter(f,el){
+  filter=f;
+  document.querySelectorAll('.nav-item').forEach(function(n){n.classList.remove('active')});
+  if(el)el.classList.add('active');
+  renderList();
+}
 
 function getList(){
   var q=(document.getElementById('searchInput').value||'').toLowerCase();
@@ -611,14 +623,14 @@ function renderList(){
   grid.innerHTML=list.map(function(p){
     var bg_fg=pal(p.id);var isOpen=openId===p.id;
     var a=assignee(p);
-    var sl={received:'Waiting to schedule',scheduled:'Appt: '+(p.appt_date||'TBD')+(p.appt_time?' @ '+p.appt_time:''),completed:'Done: '+(p.completed_date||''),incomplete:'Not completed',unreachable:'Unable to reach'}[p.status]||'';
+    var sl={'Order Received':'Waiting to schedule','Appt Scheduled':'Appt: '+(p.appt_date||'TBD')+(p.appt_time?' @ '+p.appt_time:''),'Completed':'Done: '+(p.completed_date||''),'Not Completed':'Not completed','Unable to Reach':'Unable to reach'}[p.status]||'';
     return '<div class="pcard'+(isOpen?' open':'')+'" id="pc-'+p.id+'" onclick="toggleCard(\''+p.id+'\')">'+
       '<div class="pcard-top">'+
       '<div class="avatar" style="background:'+bg_fg[0]+';color:'+bg_fg[1]+'">'+ini(p.name)+'</div>'+
       '<div class="pcard-info"><div class="pcard-name">'+p.name+'</div><div class="pcard-meta">'+(p.service_type||'--')+' &middot; '+(p.provider||'--')+(a?' &middot; <strong>'+a+'</strong>':'')+'</div></div>'+
       '<div class="pcard-right">'+srcTag(p.source)+'<span class="sbadge '+(BADGE[p.status]||'sb-received')+'">'+(BLABEL[p.status]||p.status)+'</span><span class="chevron">&#9660;</span></div>'+
       '</div>'+
-      '<div class="j-wrap"><div class="j-seg '+segCls(p.status,'received')+'"></div><div class="j-seg '+segCls(p.status,'scheduled')+'"></div><div class="j-seg '+segCls(p.status,'completed')+'"></div><span class="j-label">'+sl+'</span></div>'+
+      '<div class="j-wrap"><div class="j-seg '+segCls(p.status,'Order Received')+'"></div><div class="j-seg '+segCls(p.status,'Appt Scheduled')+'"></div><div class="j-seg '+segCls(p.status,'Completed')+'"></div><span class="j-label">'+sl+'</span></div>'+
       '<div class="detail" id="det-'+p.id+'" onclick="event.stopPropagation()">'+detailHTML(p)+'</div>'+
       '</div>';
   }).join('');
@@ -636,8 +648,8 @@ function detailHTML(p){
     '<div class="drow"><span class="drow-label">MRN</span><span class="drow-val">'+(p.mrn||'--')+'</span></div></div>'+
     '<div class="dsec"><div class="dsec-title">Journey Timeline</div><div class="tl">'+
     '<div class="tl-row"><div class="tl-dot done">&#10003;</div><div class="tl-info"><div class="tl-name">Order Received</div><div class="tl-date">'+(p.order_date||p.created_at||'--').slice(0,10)+'</div></div></div>'+
-    '<div class="tl-row"><div class="tl-dot '+(p.appt_date?'done':p.status==='incomplete'?'warn':'pending')+'">'+(p.appt_date?'&#10003;':p.status==='incomplete'?'!':'&#9711;')+'</div><div class="tl-info"><div class="tl-name">Appointment</div><div class="tl-date">'+(p.appt_date?p.appt_date+(p.appt_time?' @ '+p.appt_time:''):'Not scheduled')+'</div></div></div>'+
-    '<div class="tl-row"><div class="tl-dot '+(p.status==='completed'?'done':p.status==='incomplete'?'warn':p.status==='unreachable'?'danger':'pending')+'">'+(p.status==='completed'?'&#10003;':p.status==='incomplete'?'!':p.status==='unreachable'?'&#10007;':'&#9711;')+'</div><div class="tl-info"><div class="tl-name">'+(p.status==='completed'?'Completed':p.status==='incomplete'?'Not Completed':p.status==='unreachable'?'Unable to Reach':'Pending')+'</div><div class="tl-date">'+(p.status==='completed'&&p.completed_date?p.completed_date+(p.completed_time?' @ '+p.completed_time:''):p.incomplete_reason||p.unreachable_reason||'--')+'</div></div></div>'+
+    '<div class="tl-row"><div class="tl-dot '+(p.appt_date?'done':p.status==='Not Completed'?'warn':'pending')+'">'+(p.appt_date?'&#10003;':p.status==='Not Completed'?'!':'&#9711;')+'</div><div class="tl-info"><div class="tl-name">Appointment</div><div class="tl-date">'+(p.appt_date?p.appt_date+(p.appt_time?' @ '+p.appt_time:''):'Not scheduled')+'</div></div></div>'+
+    '<div class="tl-row"><div class="tl-dot '+(p.status==='Completed'?'done':p.status==='Not Completed'?'warn':p.status==='Unable to Reach'?'danger':'pending')+'">'+(p.status==='Completed'?'&#10003;':p.status==='Not Completed'?'!':p.status==='Unable to Reach'?'&#10007;':'&#9711;')+'</div><div class="tl-info"><div class="tl-name">'+(p.status==='Completed'?'Completed':p.status==='Not Completed'?'Not Completed':p.status==='Unable to Reach'?'Unable to Reach':'Pending')+'</div><div class="tl-date">'+(p.status==='Completed'&&p.completed_date?p.completed_date+(p.completed_time?' @ '+p.completed_time:''):p.incomplete_reason||p.unreachable_reason||'--')+'</div></div></div>'+
     '</div></div>'+
     (canEdit?'<div class="dsec full"><div class="dsec-title">Update Status</div><div class="urow" id="ur-'+p.id+'">'+buildUrow(p)+'</div></div>':'')+
     (canEdit?'<div class="dsec full"><div class="dsec-title">Notes</div><textarea class="notes-ta" id="nt-'+p.id+'">'+(p.notes||'')+'</textarea><div class="notes-row"><button class="save-btn" onclick="saveNotes(\''+p.id+'\')">Save Notes</button></div></div>':'')+
@@ -646,16 +658,16 @@ function detailHTML(p){
 
 function buildUrow(p){
   var s=p.status,ex='';
-  if(s==='scheduled')ex='<input class="cinp" type="date" id="ua-'+p.id+'" value="'+(p.appt_date||'')+'"><input class="cinp" type="time" id="ub-'+p.id+'" value="'+(p.appt_time||'')+'">';
-  if(s==='completed')ex='<input class="cinp" type="date" id="ua-'+p.id+'" value="'+(p.completed_date||'')+'"><input class="cinp" type="time" id="ub-'+p.id+'" value="'+(p.completed_time||'')+'">';
-  if(s==='incomplete')ex='<input class="cinp" id="ua-'+p.id+'" value="'+(p.incomplete_reason||'')+'" placeholder="Reason" style="flex:1;min-width:160px">';
-  if(s==='unreachable')ex='<input class="cinp" id="ua-'+p.id+'" value="'+(p.unreachable_reason||'')+'" placeholder="Reason" style="flex:1;min-width:160px">';
+  if(s==='Appt Scheduled')ex='<input class="cinp" type="date" id="ua-'+p.id+'" value="'+(p.appt_date||'')+'"><input class="cinp" type="time" id="ub-'+p.id+'" value="'+(p.appt_time||'')+'">';
+  if(s==='Completed')ex='<input class="cinp" type="date" id="ua-'+p.id+'" value="'+(p.completed_date||'')+'"><input class="cinp" type="time" id="ub-'+p.id+'" value="'+(p.completed_time||'')+'">';
+  if(s==='Not Completed')ex='<input class="cinp" id="ua-'+p.id+'" value="'+(p.incomplete_reason||'')+'" placeholder="Reason" style="flex:1;min-width:160px">';
+  if(s==='Unable to Reach')ex='<input class="cinp" id="ua-'+p.id+'" value="'+(p.unreachable_reason||'')+'" placeholder="Reason" style="flex:1;min-width:160px">';
   return '<select class="csel" id="us-'+p.id+'" onchange="refreshUrow(\''+p.id+'\')">'+
-    '<option value="received"'+(s==='received'?' selected':'')+'>Order Received</option>'+
-    '<option value="scheduled"'+(s==='scheduled'?' selected':'')+'>Appt Scheduled</option>'+
-    '<option value="completed"'+(s==='completed'?' selected':'')+'>Completed</option>'+
-    '<option value="incomplete"'+(s==='incomplete'?' selected':'')+'>Not Completed</option>'+
-    '<option value="unreachable"'+(s==='unreachable'?' selected':'')+'>Unable to Reach</option>'+
+    '<option value="Order Received"'+(s==='Order Received'?' selected':'')+'>Order Received</option>'+
+    '<option value="Appt Scheduled"'+(s==='Appt Scheduled'?' selected':'')+'>Appt Scheduled</option>'+
+    '<option value="Completed"'+(s==='Completed'?' selected':'')+'>Completed</option>'+
+    '<option value="Not Completed"'+(s==='Not Completed'?' selected':'')+'>Not Completed</option>'+
+    '<option value="Unable to Reach"'+(s==='Unable to Reach'?' selected':'')+'>Unable to Reach</option>'+
     '</select><div id="ue-'+p.id+'" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">'+ex+'</div>'+
     '<button class="save-btn" onclick="saveStatus(\''+p.id+'\')">Save</button>'+
     (currentProfile&&currentProfile.role==='admin'?'<button class="del-btn" onclick="confirmDel(\''+p.id+'\')">Remove</button>':'');
@@ -665,10 +677,10 @@ function refreshUrow(id){
   var s=document.getElementById('us-'+id).value;
   var p=patients.find(function(x){return x.id===id})||{};
   var ex='';
-  if(s==='scheduled')ex='<input class="cinp" type="date" id="ua-'+id+'" value="'+(p.appt_date||'')+'"><input class="cinp" type="time" id="ub-'+id+'" value="'+(p.appt_time||'')+'">';
-  if(s==='completed')ex='<input class="cinp" type="date" id="ua-'+id+'" value="'+(p.completed_date||'')+'"><input class="cinp" type="time" id="ub-'+id+'" value="'+(p.completed_time||'')+'">';
-  if(s==='incomplete')ex='<input class="cinp" id="ua-'+id+'" value="'+(p.incomplete_reason||'')+'" placeholder="Reason" style="flex:1;min-width:160px">';
-  if(s==='unreachable')ex='<input class="cinp" id="ua-'+id+'" value="'+(p.unreachable_reason||'')+'" placeholder="Reason" style="flex:1;min-width:160px">';
+  if(s==='Appt Scheduled')ex='<input class="cinp" type="date" id="ua-'+id+'" value="'+(p.appt_date||'')+'"><input class="cinp" type="time" id="ub-'+id+'" value="'+(p.appt_time||'')+'">';
+  if(s==='Completed')ex='<input class="cinp" type="date" id="ua-'+id+'" value="'+(p.completed_date||'')+'"><input class="cinp" type="time" id="ub-'+id+'" value="'+(p.completed_time||'')+'">';
+  if(s==='Not Completed')ex='<input class="cinp" id="ua-'+id+'" value="'+(p.incomplete_reason||'')+'" placeholder="Reason" style="flex:1;min-width:160px">';
+  if(s==='Unable to Reach')ex='<input class="cinp" id="ua-'+id+'" value="'+(p.unreachable_reason||'')+'" placeholder="Reason" style="flex:1;min-width:160px">';
   document.getElementById('ue-'+id).innerHTML=ex;
 }
 
@@ -678,10 +690,10 @@ async function saveStatus(id){
   var ua=(document.getElementById('ua-'+id)||{}).value||'';
   var ub=(document.getElementById('ub-'+id)||{}).value||'';
   var upd={status:s,updated_at:new Date().toISOString()};
-  if(s==='scheduled'){upd.appt_date=ua;upd.appt_time=ub}
-  if(s==='completed'){upd.completed_date=ua;upd.completed_time=ub}
-  if(s==='incomplete')upd.incomplete_reason=ua;
-  if(s==='unreachable')upd.unreachable_reason=ua;
+  if(s==='Appt Scheduled'){upd.appt_date=ua;upd.appt_time=ub}
+  if(s==='Completed'){upd.completed_date=ua;upd.completed_time=ub}
+  if(s==='Not Completed')upd.incomplete_reason=ua;
+  if(s==='Unable to Reach')upd.unreachable_reason=ua;
   Object.assign(p,upd);await apiPatch(id,upd);
   renderAll();renderMetrics();openId=id;renderList();toast('Status updated');
 }
@@ -717,22 +729,22 @@ function setFilter(f,el){
 // ── METRICS ──
 function renderMetrics(){
   var total=patients.length;
-  var c={completed:0,scheduled:0,received:0,incomplete:0,unreachable:0};
+  var c={'Completed':0,'Appt Scheduled':0,'Order Received':0,'Not Completed':0,'Unable to Reach':0};
   patients.forEach(function(p){c[p.status]=(c[p.status]||0)+1});
-  var pct=total?Math.round(c.completed/total*100):0;
+  var pct=total?Math.round((c['Completed']||0)/total*100):0;
   document.getElementById('miniStats').innerHTML=
     '<div class="mini-stat"><div class="mini-stat-val" style="color:var(--teal)">'+pct+'%</div><div class="mini-stat-label">Completion Rate</div></div>'+
     '<div class="mini-stat"><div class="mini-stat-val">'+total+'</div><div class="mini-stat-label">Total Patients</div></div>'+
-    '<div class="mini-stat"><div class="mini-stat-val" style="color:var(--amber)">'+(c.incomplete+c.unreachable)+'</div><div class="mini-stat-label">Needs Attention</div></div>';
+    '<div class="mini-stat"><div class="mini-stat-val" style="color:var(--amber)">'+((c['Not Completed']||0)+(c['Unable to Reach']||0))+'</div><div class="mini-stat-label">Needs Attention</div></div>';
   document.getElementById('bigPct').textContent=pct+'%';
-  document.getElementById('bigPctSub').textContent=c.completed+' of '+total+' orders completed';
-  var segs=[{k:'completed',col:'#00c5a1'},{k:'scheduled',col:'#7c5cbf'},{k:'received',col:'#8896ab'},{k:'incomplete',col:'#f5a623'},{k:'unreachable',col:'#e8453c'}];
+  document.getElementById('bigPctSub').textContent=(c['Completed']||0)+' of '+total+' orders completed';
+  var segs=[{k:'Completed',col:'#00c5a1'},{k:'Appt Scheduled',col:'#7c5cbf'},{k:'Order Received',col:'#8896ab'},{k:'Not Completed',col:'#f5a623'},{k:'Unable to Reach',col:'#e8453c'}];
   document.getElementById('metricsBar').innerHTML=total?segs.map(function(s){return'<div style="width:'+Math.round((c[s.k]||0)/total*100)+'%;background:'+s.col+';height:100%"></div>'}).join(''):'';
   renderDonut(c,total);renderLB();
 }
 
 function renderDonut(c,total){
-  var segs=[{k:'completed',col:'#00c5a1',l:'Completed'},{k:'scheduled',col:'#7c5cbf',l:'Scheduled'},{k:'received',col:'#8896ab',l:'Received'},{k:'incomplete',col:'#f5a623',l:'Not Completed'},{k:'unreachable',col:'#e8453c',l:'Unable to Reach'}];
+  var segs=[{k:'Completed',col:'#00c5a1',l:'Completed'},{k:'Appt Scheduled',col:'#7c5cbf',l:'Scheduled'},{k:'Order Received',col:'#8896ab',l:'Received'},{k:'Not Completed',col:'#f5a623',l:'Not Completed'},{k:'Unable to Reach',col:'#e8453c',l:'Unable to Reach'}];
   var cx=60,cy=60,r=46,sw=16,circ=2*Math.PI*r,offset=0,paths='';
   segs.forEach(function(s){var val=c[s.k]||0,pct=total?val/total:0,dash=pct*circ;if(dash>0){paths+='<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="none" stroke="'+s.col+'" stroke-width="'+sw+'" stroke-dasharray="'+dash+' '+(circ-dash)+'" stroke-dashoffset="'+(-offset*circ)+'" transform="rotate(-90 '+cx+' '+cy+')"/>';offset+=pct}});
   document.getElementById('donutSvg').innerHTML=paths+'<text x="60" y="56" text-anchor="middle" font-size="16" font-weight="700" fill="#0d1b2e">'+(total?Math.round(c.completed/total*100):0)+'%</text><text x="60" y="70" text-anchor="middle" font-size="9" fill="#8896ab">COMPLETE</text>';
@@ -764,7 +776,7 @@ document.getElementById('addOverlay').addEventListener('click',function(e){if(e.
 async function submitAdd(){
   var name=document.getElementById('f-name').value.trim();
   if(!name){alert('Name required');return}
-  var data={name:name,dob:document.getElementById('f-dob').value,provider:document.getElementById('f-provider').value,service_type:document.getElementById('f-service').value,phone:document.getElementById('f-phone').value,email:document.getElementById('f-email').value,assignee:document.getElementById('f-assignee').value,order_date:document.getElementById('f-orderdate').value||new Date().toISOString().slice(0,10),notes:document.getElementById('f-notes').value,status:'received',appt_date:'',appt_time:'',completed_date:'',completed_time:'',incomplete_reason:'',unreachable_reason:'',source:'manual',received_at:new Date().toISOString()};
+  var data={name:name,dob:document.getElementById('f-dob').value,provider:document.getElementById('f-provider').value,service_type:document.getElementById('f-service').value,phone:document.getElementById('f-phone').value,email:document.getElementById('f-email').value,assignee:document.getElementById('f-assignee').value,order_date:document.getElementById('f-orderdate').value||new Date().toISOString().slice(0,10),notes:document.getElementById('f-notes').value,status:'Order Received',appt_date:'',appt_time:'',completed_date:'',completed_time:'',incomplete_reason:'',unreachable_reason:'',source:'manual',received_at:new Date().toISOString()};
   await apiPost(data,function(p){patients.unshift(p);renderAll();renderMetrics();toast('Patient added')});
   closeAdd();
   ['f-name','f-dob','f-provider','f-service','f-phone','f-email','f-assignee','f-orderdate','f-notes'].forEach(function(id){document.getElementById(id).value=''});
@@ -806,7 +818,7 @@ function parsePaste(){var t=document.getElementById('pasteInput').value;if(!t.tr
 async function runImport(){
   if(!impRows.length)return;
   var btn=document.getElementById('impBtn');btn.textContent='Importing...';btn.disabled=true;
-  var valid=['received','scheduled','completed','incomplete','unreachable'];
+  var valid=['Order Received','Appt Scheduled','Completed','Not Completed','Unable to Reach'];
   var done=0;
   for(var i=0;i<impRows.length;i++){
     var row=impRows[i];
