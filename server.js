@@ -4,7 +4,8 @@ const crypto = require('crypto');
 const path = require('path');
 const session = require('express-session');
 const { Pool } = require('pg');
-
+const { createClient } = require('@supabase/supabase-js');
+const payrollWebhook = require('./payroll-webhook');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -223,7 +224,7 @@ app.get('/webhook/test',async(req,res)=>{
   try{const p=buildPatient({first_name:'Test',last_name:'Patient',date_of_birth:'1980-01-01',phone:'+16175550000',number_14fga:'TEST001'});p.source='test';await insertPatient(p);res.json({message:'Test patient injected',patient:p})}
   catch(err){res.status(500).json({error:err.message})}
 });
-
+app.use('/payroll', payrollWebhook);
 app.use(express.static(path.join(__dirname,'public')));
 
 async function start(){
