@@ -75,7 +75,12 @@ async function getRate(phlebotomistId, drawType) {
       .select('rate, rate_type')
       .eq('phlebotomist_id', phlebotomistId)
       .limit(1)
-      .single();
+      const phlebotomistName =
+  payload.customData?.assigned_phlebotomist ||
+  payload.customData?.['ASSIGNED PHLEBOTOMIST'] ||
+  payload['ASSIGNED PHLEBOTOMIST'] ||
+  payload.assigned_phlebotomist ||
+  null;
     return fallback || { rate: 35.00, rate_type: 'per_draw' };
   }
   return data;
