@@ -1,0 +1,922 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>BMH — Payroll Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root {
+  --bg:#0d0d1a; --sidebar:#111127; --card:#16162a; --card2:#1c1c35;
+  --border:rgba(255,255,255,0.07); --border-hover:rgba(124,58,237,0.35);
+  --purple:#7c3aed; --purple2:#9d5ff0; --purple-bg:rgba(124,58,237,0.15); --purple-dim:rgba(124,58,237,0.08);
+  --green:#22c55e; --green-bg:rgba(34,197,94,0.12);
+  --orange:#f97316; --orange-bg:rgba(249,115,22,0.12);
+  --teal:#06b6d4; --teal-bg:rgba(6,182,212,0.12);
+  --red:#ef4444; --red-bg:rgba(239,68,68,0.12);
+  --yellow:#eab308; --yellow-bg:rgba(234,179,8,0.12);
+  --white:#ffffff; --text:#e2e8f0; --muted:#64748b; --muted2:#94a3b8;
+  --radius:12px; --radius-sm:8px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;overflow:hidden;}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);display:flex;height:100vh;}
+::-webkit-scrollbar{width:4px;height:4px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:rgba(124,58,237,0.3);border-radius:10px;}
+
+/* SIDEBAR */
+.sidebar{width:220px;min-width:220px;background:var(--sidebar);border-right:1px solid var(--border);display:flex;flex-direction:column;height:100vh;overflow-y:auto;flex-shrink:0;}
+.sb-logo{padding:22px 20px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:11px;}
+.logo-mark{width:38px;height:38px;background:linear-gradient(135deg,var(--purple),var(--purple2));border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#fff;flex-shrink:0;}
+.logo-top{font-size:13px;font-weight:800;color:var(--white);line-height:1.2;}
+.logo-bot{font-size:10px;font-weight:500;color:var(--purple2);margin-top:1px;}
+.nav-section{padding:14px 12px 6px;}
+.nav-label{font-size:9px;font-weight:600;color:var(--muted);letter-spacing:1.2px;text-transform:uppercase;padding:0 8px;margin-bottom:5px;}
+.nav-item{display:flex;align-items:center;gap:10px;padding:8px 11px;border-radius:var(--radius-sm);cursor:pointer;font-size:13px;font-weight:500;color:var(--muted2);transition:all .12s;border:none;background:none;width:100%;text-align:left;margin-bottom:1px;}
+.nav-item:hover{background:rgba(255,255,255,0.04);color:var(--text);}
+.nav-item.active{background:var(--purple-bg);color:var(--white);font-weight:600;}
+.nav-icon{width:17px;text-align:center;font-size:14px;flex-shrink:0;opacity:.8;}
+.sb-bottom{margin-top:auto;padding:14px 14px 16px;border-top:1px solid var(--border);}
+.user-row{display:flex;align-items:center;gap:9px;padding:9px 10px;border-radius:var(--radius-sm);cursor:pointer;margin-bottom:12px;}
+.user-av{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--purple),var(--purple2));display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;color:#fff;flex-shrink:0;}
+.user-name{font-size:13px;font-weight:600;color:var(--white);}
+.user-role{font-size:11px;color:var(--muted2);}
+.mission{background:var(--purple-dim);border:1px solid rgba(124,58,237,0.18);border-radius:var(--radius-sm);padding:11px 13px;}
+.mission-lbl{font-size:9px;font-weight:700;letter-spacing:1.5px;color:var(--purple2);text-transform:uppercase;margin-bottom:5px;}
+.mission p{font-size:11px;color:var(--muted2);line-height:1.65;font-style:italic;}
+
+/* MAIN */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0;}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:18px 26px;border-bottom:1px solid var(--border);background:var(--bg);flex-shrink:0;gap:12px;flex-wrap:wrap;}
+.tb-title{font-size:22px;font-weight:800;color:var(--white);line-height:1.2;}
+.tb-sub{font-size:13px;color:var(--muted2);margin-top:2px;}
+.tb-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.period-pill{display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 13px;}
+.period-pill select{background:none;border:none;color:var(--text);font-family:'Inter',sans-serif;font-size:13px;font-weight:500;outline:none;cursor:pointer;max-width:210px;}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:var(--radius-sm);font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer;border:none;transition:all .12s;white-space:nowrap;}
+.btn-purple{background:var(--purple);color:#fff;}
+.btn-purple:hover{background:var(--purple2);}
+.btn-ghost{background:var(--card);border:1px solid var(--border);color:var(--muted2);}
+.btn-ghost:hover{color:var(--text);border-color:rgba(255,255,255,0.14);}
+.btn-sm{padding:7px 14px;font-size:12px;}
+.btn-green{background:var(--green-bg);border:1px solid rgba(34,197,94,0.2);color:var(--green);}
+
+/* LIVE INDICATOR */
+.live-dot{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:600;color:var(--green);font-family:'Inter',monospace;}
+.live-dot::before{content:'';width:7px;height:7px;border-radius:50%;background:var(--green);animation:pulse-green 2s infinite;}
+@keyframes pulse-green{0%,100%{opacity:1;}50%{opacity:.3;}}
+
+/* CONTENT */
+.content{flex:1;overflow-y:auto;padding:22px 26px;}
+
+/* ALERT */
+.alert-bar{display:flex;align-items:center;gap:13px;background:rgba(124,58,237,0.07);border:1px solid rgba(124,58,237,0.22);border-left:3px solid var(--purple);border-radius:var(--radius);padding:13px 18px;margin-bottom:20px;}
+.alert-icon-wrap{width:34px;height:34px;border-radius:50%;background:var(--purple-bg);display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;}
+.alert-h{font-size:13px;font-weight:700;color:var(--white);margin-bottom:2px;}
+.alert-p{font-size:12px;color:var(--muted2);}
+.alert-action{margin-left:auto;flex-shrink:0;}
+
+/* STAT CARDS */
+.stat-row{display:grid;grid-template-columns:repeat(5,1fr);gap:13px;margin-bottom:20px;}
+.sc{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:17px 17px 15px;transition:border-color .18s,transform .12s;}
+.sc:hover{border-color:var(--border-hover);transform:translateY(-1px);}
+.sc-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:11px;}
+.sc-label{font-size:10px;font-weight:600;color:var(--muted2);letter-spacing:.4px;text-transform:uppercase;}
+.sc-icon{width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;}
+.sc-value{font-size:24px;font-weight:800;color:var(--white);line-height:1;margin-bottom:7px;letter-spacing:-.5px;}
+.sc-sub{font-size:11px;color:var(--muted);}
+
+/* GRID */
+.two-col{display:grid;grid-template-columns:1fr 330px;gap:16px;margin-bottom:16px;}
+.two-col-eq{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+
+/* CARD */
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
+.card-head{display:flex;align-items:center;justify-content:space-between;padding:15px 19px;border-bottom:1px solid var(--border);}
+.card-title{font-size:12px;font-weight:700;color:var(--white);letter-spacing:.3px;text-transform:uppercase;}
+.card-actions{display:flex;align-items:center;gap:8px;}
+.view-all{font-size:12px;font-weight:500;color:var(--purple2);cursor:pointer;background:none;border:none;transition:color .12s;padding:0;}
+.view-all:hover{color:var(--white);}
+
+/* TABLE */
+.rtable{width:100%;border-collapse:collapse;}
+.rtable thead tr{border-bottom:1px solid var(--border);}
+.rtable thead th{padding:9px 15px;text-align:left;font-size:9px;font-weight:600;color:var(--muted);letter-spacing:.9px;text-transform:uppercase;white-space:nowrap;}
+.rtable tbody tr{border-bottom:1px solid var(--border);transition:background .1s;}
+.rtable tbody tr:last-child{border-bottom:none;}
+.rtable tbody tr:hover{background:rgba(255,255,255,0.018);}
+.rtable tbody td{padding:11px 15px;font-size:13px;vertical-align:middle;}
+
+/* PHLEB */
+.phleb-cell{display:flex;align-items:center;gap:9px;}
+.pav{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;flex-shrink:0;}
+.pav0{background:linear-gradient(135deg,#7c3aed,#9d5ff0);}
+.pav1{background:linear-gradient(135deg,#0891b2,#06b6d4);}
+.pav2{background:linear-gradient(135deg,#a16207,#d97706);}
+.pav3{background:linear-gradient(135deg,#15803d,#22c55e);}
+.pav4{background:linear-gradient(135deg,#c2410c,#f97316);}
+.pav5{background:linear-gradient(135deg,#be185d,#ec4899);}
+.pav6{background:linear-gradient(135deg,#1d4ed8,#3b82f6);}
+.pname{font-size:13px;font-weight:600;color:var(--white);line-height:1.3;}
+.pnote{font-size:10px;color:var(--muted);margin-top:1px;}
+
+/* PILLS */
+.tpill{display:inline-flex;align-items:center;padding:2px 9px;border-radius:20px;font-size:10px;font-weight:600;margin-right:3px;margin-bottom:2px;}
+.tp-bmc{background:var(--teal-bg);color:var(--teal);}
+.tp-pvt{background:var(--purple-bg);color:var(--purple2);}
+.tp-prem{background:var(--yellow-bg);color:var(--yellow);}
+.tp-evt{background:var(--orange-bg);color:var(--orange);}
+
+/* PAYOUT */
+.pval{font-size:14px;font-weight:700;}
+.pval.pos{color:var(--green);}
+.pval.prem{color:var(--yellow);}
+.pval.zero{color:var(--muted);font-weight:400;}
+
+/* STATUS */
+.sbtn{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;font-size:10px;font-weight:600;cursor:pointer;border:none;transition:all .12s;}
+.sb-pend{background:var(--yellow-bg);color:var(--yellow);}
+.sb-paid{background:var(--green-bg);color:var(--green);}
+.sb-hold{background:var(--red-bg);color:var(--red);}
+.sb-unassigned{background:rgba(100,116,139,0.15);color:var(--muted2);}
+
+/* SOURCE BADGE */
+.src-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:500;}
+.src-live{background:var(--green-bg);color:var(--green);}
+.src-manual{background:rgba(100,116,139,0.15);color:var(--muted2);}
+
+/* DRAW COUNT */
+.draw-num{font-family:'Inter',monospace;font-size:15px;font-weight:700;color:var(--white);}
+.draw-zero{color:var(--muted);}
+
+/* PP ITEMS */
+.pp-item{display:flex;align-items:center;gap:11px;padding:12px 18px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s;}
+.pp-item:last-child{border-bottom:none;}
+.pp-item:hover{background:rgba(255,255,255,0.02);}
+.pp-item.cur{background:rgba(124,58,237,0.05);border-left:3px solid var(--purple);padding-left:15px;}
+.pp-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+.pp-pay{font-size:13px;font-weight:700;color:var(--white);}
+.pp-range{font-size:11px;color:var(--muted);margin-top:1px;}
+
+/* RATE GRID */
+.rate-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;padding:15px 18px;}
+.ri{background:var(--card2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:11px 13px;}
+.ri-name{font-size:11px;font-weight:600;color:var(--white);margin-bottom:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.ri-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;}
+.ri-row:last-child{margin-bottom:0;}
+.ri-type{font-size:10px;color:var(--muted);}
+.ri-amt{font-size:12px;font-weight:700;color:var(--purple2);}
+
+/* NOTIF */
+.notif-item{display:flex;align-items:flex-start;gap:11px;padding:12px 18px;border-bottom:1px solid var(--border);}
+.notif-item:last-child{border-bottom:none;}
+.ndot{width:7px;height:7px;border-radius:50%;margin-top:4px;flex-shrink:0;}
+.ntitle{font-size:13px;font-weight:600;color:var(--white);margin-bottom:2px;}
+.ndesc{font-size:12px;color:var(--muted2);line-height:1.5;}
+.ntime{font-size:10px;color:var(--muted);margin-top:4px;}
+.nbadge{margin-left:auto;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:600;flex-shrink:0;align-self:flex-start;}
+.nb-urgent{background:var(--red-bg);color:var(--red);}
+.nb-soon{background:var(--yellow-bg);color:var(--yellow);}
+.nb-info{background:var(--purple-bg);color:var(--purple2);}
+
+/* TEAM */
+.team-row{display:flex;align-items:center;gap:11px;padding:11px 18px;border-bottom:1px solid var(--border);}
+.team-row:last-child{border-bottom:none;}
+.tname{font-size:13px;font-weight:600;color:var(--white);}
+.tnote{font-size:11px;color:var(--muted);margin-top:1px;}
+.tpay{font-size:13px;font-weight:700;color:var(--green);margin-left:auto;flex-shrink:0;margin-right:10px;}
+
+/* LOADING */
+.loading-overlay{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:500;flex-direction:column;gap:16px;}
+.loading-spinner{width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--purple);border-radius:50%;animation:spin .8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.loading-text{font-size:13px;color:var(--muted2);}
+
+/* MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.78);z-index:200;display:none;align-items:center;justify-content:center;padding:20px;}
+.modal-overlay.open{display:flex;}
+.modal{background:var(--card);border:1px solid rgba(124,58,237,0.28);border-radius:14px;width:100%;max-width:580px;overflow:hidden;max-height:90vh;display:flex;flex-direction:column;}
+.modal-head{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border);}
+.modal-head h3{font-size:15px;font-weight:700;color:var(--white);}
+.mclose{background:none;border:none;color:var(--muted2);cursor:pointer;font-size:20px;line-height:1;}
+.mclose:hover{color:var(--white);}
+.modal-tabs{display:flex;gap:4px;padding:10px 20px;border-bottom:1px solid var(--border);overflow-x:auto;}
+.mtab{padding:5px 13px;border-radius:6px;font-size:11px;font-weight:500;cursor:pointer;color:var(--muted2);border:none;background:none;transition:all .12s;white-space:nowrap;}
+.mtab.active{background:var(--purple-bg);color:var(--white);border:1px solid rgba(124,58,237,0.28);}
+.modal-body{padding:18px 20px;overflow-y:auto;flex:1;}
+.epre{background:var(--card2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:16px;font-size:12px;line-height:1.85;color:var(--text);white-space:pre-wrap;font-family:'Inter',sans-serif;margin-bottom:12px;}
+.modal-foot{padding:12px 20px;border-top:1px solid var(--border);display:flex;gap:8px;align-items:center;}
+.copy-ok{font-size:11px;color:var(--green);display:none;}
+
+/* VIEWS */
+#view-calendar{display:none;}
+#view-rates{display:none;}
+
+@media(max-width:1100px){.stat-row{grid-template-columns:repeat(3,1fr);}.two-col{grid-template-columns:1fr;}.two-col-eq{grid-template-columns:1fr;}}
+@media(max-width:750px){.sidebar{display:none;}.stat-row{grid-template-columns:repeat(2,1fr);}}
+</style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="loading-spinner"></div>
+  <div class="loading-text">Connecting to BMH Payroll System...</div>
+</div>
+
+<!-- SIDEBAR -->
+<nav class="sidebar">
+  <div class="sb-logo">
+    <div class="logo-mark">JH</div>
+    <div>
+      <div class="logo-top">JOVON HARLEY</div>
+      <div class="logo-bot">Beyond Mobile Health</div>
+    </div>
+  </div>
+  <div class="nav-section">
+    <div class="nav-label">Main</div>
+    <button class="nav-item" onclick="window.location.href='/'"><span class="nav-icon">⊞</span> Patient Tracker</button>
+    <button class="nav-item" onclick="window.location.href='/metrics'"><span class="nav-icon">📈</span> Metrics</button>
+  </div>
+  <div class="nav-section">
+    <div class="nav-label">Payroll</div>
+    <button class="nav-item active" onclick="showView('roster',this)"><span class="nav-icon">💰</span> Payroll</button>
+    <button class="nav-item" onclick="showView('roster',this)"><span class="nav-icon">🩸</span> Roster</button>
+    <button class="nav-item" onclick="showView('calendar',this)"><span class="nav-icon">🗓</span> Pay Calendar</button>
+    <button class="nav-item" onclick="showView('rates',this)"><span class="nav-icon">📊</span> Rate Table</button>
+  </div>
+  <div class="nav-section">
+    <div class="nav-label">Actions</div>
+    <button class="nav-item" onclick="openEmailModal()"><span class="nav-icon">✉</span> Send Notices</button>
+    <button class="nav-item" onclick="exportCSV()"><span class="nav-icon">↓</span> Export CSV</button>
+    <button class="nav-item" onclick="refreshData()"><span class="nav-icon">↺</span> Refresh Data</button>
+  </div>
+  <div class="sb-bottom">
+    <div class="user-row">
+      <div class="user-av">JH</div>
+      <div>
+        <div class="user-name">Jovon Harley</div>
+        <div class="user-role">Administrator</div>
+      </div>
+    </div>
+    <div class="mission">
+      <div class="mission-lbl">Mission</div>
+      <p>"Creating access.<br/>Building legacy.<br/>Elevating communities."</p>
+    </div>
+  </div>
+</nav>
+
+<!-- MAIN -->
+<div class="main">
+  <div class="topbar">
+    <div>
+      <div class="tb-title">Payroll Dashboard</div>
+      <div class="tb-sub" id="tbSub">Loading pay period data...</div>
+    </div>
+    <div class="tb-right">
+      <span class="live-dot" id="liveIndicator">LIVE</span>
+      <div class="period-pill">
+        <span style="font-size:14px;">📅</span>
+        <select id="periodSel" onchange="onPeriodChange()"></select>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="exportCSV()">↓ CSV</button>
+      <button class="btn btn-purple btn-sm" onclick="openEmailModal()">✉ Send Notices</button>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <!-- ALERT -->
+    <div class="alert-bar">
+      <div class="alert-icon-wrap">⚡</div>
+      <div>
+        <div class="alert-h" id="alertH">Loading...</div>
+        <div class="alert-p" id="alertP">Fetching current period data from Supabase...</div>
+      </div>
+      <div class="alert-action">
+        <button class="btn btn-ghost btn-sm" onclick="markAllPaid()">✓ Mark All Paid</button>
+      </div>
+    </div>
+
+    <!-- STATS -->
+    <div class="stat-row">
+      <div class="sc">
+        <div class="sc-top"><div class="sc-label">Period Payout</div><div class="sc-icon" style="background:var(--purple-bg);">💵</div></div>
+        <div class="sc-value" id="stPayout">—</div>
+        <div class="sc-sub" id="stPaySub">Loading...</div>
+      </div>
+      <div class="sc">
+        <div class="sc-top"><div class="sc-label">Total Draws</div><div class="sc-icon" style="background:var(--teal-bg);">🩸</div></div>
+        <div class="sc-value" id="stDraws">—</div>
+        <div class="sc-sub">This period</div>
+      </div>
+      <div class="sc">
+        <div class="sc-top"><div class="sc-label">BMC Draws</div><div class="sc-icon" style="background:var(--teal-bg);">🏥</div></div>
+        <div class="sc-value" id="stBMC">—</div>
+        <div class="sc-sub">Boston Medical</div>
+      </div>
+      <div class="sc">
+        <div class="sc-top"><div class="sc-label">Private Draws</div><div class="sc-icon" style="background:var(--purple-bg);">🔬</div></div>
+        <div class="sc-value" id="stPvt">—</div>
+        <div class="sc-sub">All private sources</div>
+      </div>
+      <div class="sc">
+        <div class="sc-top"><div class="sc-label">Paid Out</div><div class="sc-icon" style="background:var(--green-bg);">✅</div></div>
+        <div class="sc-value" id="stPaid">— / 7</div>
+        <div class="sc-sub">Contractors confirmed</div>
+      </div>
+    </div>
+
+    <!-- ROSTER VIEW -->
+    <div id="view-roster">
+      <div class="two-col">
+        <div class="card">
+          <div class="card-head">
+            <div class="card-title">Phlebotomist Roster — <span id="periodLabel" style="color:var(--purple2);">Loading...</span></div>
+            <div class="card-actions">
+              <span class="src-badge src-live">● Live from GHL</span>
+              <button class="btn btn-ghost btn-sm" onclick="refreshData()">↺ Refresh</button>
+            </div>
+          </div>
+          <div style="overflow-x:auto;">
+            <table class="rtable">
+              <thead>
+                <tr>
+                  <th>Phlebotomist</th>
+                  <th>Draw Type</th>
+                  <th>BMC Draws</th>
+                  <th>Private Draws</th>
+                  <th>Event Hrs</th>
+                  <th>Payout</th>
+                  <th>Method</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="rosterBody">
+                <tr><td colspan="8" style="text-align:center;padding:40px;color:var(--muted);font-size:13px;">Loading contractor data...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:14px;">
+          <div class="card">
+            <div class="card-head">
+              <div class="card-title">Upcoming Pay Dates</div>
+              <button class="view-all" onclick="showView('calendar')">View all →</button>
+            </div>
+            <div id="upcomingList"></div>
+          </div>
+          <div class="card">
+            <div class="card-head">
+              <div class="card-title">Rate Summary</div>
+              <button class="view-all" onclick="showView('rates')">Full table →</button>
+            </div>
+            <div class="rate-grid" id="rateSummary"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="two-col-eq">
+        <div class="card">
+          <div class="card-head"><div class="card-title">Payroll Reminders</div></div>
+          <div id="notifList"></div>
+        </div>
+        <div class="card">
+          <div class="card-head">
+            <div class="card-title">Team Payout Summary</div>
+            <button class="view-all" onclick="openEmailModal()">Send all →</button>
+          </div>
+          <div id="teamSummary"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CALENDAR VIEW -->
+    <div id="view-calendar">
+      <div class="card">
+        <div class="card-head"><div class="card-title">2026 Pay Calendar — 26 Periods</div></div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(185px,1fr));gap:12px;padding:18px;" id="calGrid"></div>
+      </div>
+    </div>
+
+    <!-- RATES VIEW -->
+    <div id="view-rates">
+      <div class="card">
+        <div class="card-head"><div class="card-title">Master Rate Table</div></div>
+        <div style="overflow-x:auto;">
+          <table class="rtable">
+            <thead><tr><th>Phlebotomist</th><th>Draw Type</th><th>Rate</th><th>Unit</th><th>Payment Method</th><th>Notes</th></tr></thead>
+            <tbody id="rateBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- EMAIL MODAL -->
+<div class="modal-overlay" id="emailModal">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>Payment Notification Emails</h3>
+      <button class="mclose" onclick="closeModal()">×</button>
+    </div>
+    <div class="modal-tabs" id="emailTabs"></div>
+    <div class="modal-body"><div class="epre" id="emailContent"></div></div>
+    <div class="modal-foot">
+      <button class="btn btn-purple btn-sm" onclick="copyEmail()">Copy Email</button>
+      <button class="btn btn-ghost btn-sm" onclick="closeModal()">Close</button>
+      <span class="copy-ok" id="copyOk">✓ Copied</span>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════
+// SUPABASE CONNECTION
+// ═══════════════════════════════════════════════
+const SUPABASE_URL = 'https://hnamuztnddupqasikrfi.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhuYW11enRuZGR1cHFhc2lrcmZpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxODY5MjcsImV4cCI6MjA5MDc2MjkyN30.Y2fWzyzMv1HJcjaBx6dvzhdhkOkZSo6eakif4T2I-1M';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// ═══════════════════════════════════════════════
+// MASTER ROSTER (rates + display config)
+// ═══════════════════════════════════════════════
+const PHLEBS = [
+  {id:'a1000000-0000-0000-0000-000000000001', name:'Shari Bagnor',     ini:'SB', av:0, method:'Zelle or ACH',  rates:{BMC:35,private:50}, note:'BMC $35 · Private $50'},
+  {id:'a1000000-0000-0000-0000-000000000002', name:'Dara Chase',        ini:'DC', av:1, method:'Zelle',         rates:{BMC:35,private:35}, note:'All draws $35'},
+  {id:'a1000000-0000-0000-0000-000000000003', name:'Chermaine Morson',  ini:'CM', av:2, method:'Zelle',         rates:{private:150},       note:'Specialized · Premium'},
+  {id:'a1000000-0000-0000-0000-000000000004', name:'Jamie Porrazzo',    ini:'JP', av:3, method:'Zelle',         rates:{BMC:35,private:35}, note:'All draws $35'},
+  {id:'a1000000-0000-0000-0000-000000000005', name:'Charlene Oliver',   ini:'CO', av:4, method:'Zelle',         rates:{BMC:35,private:35}, note:'All draws $35'},
+  {id:'a1000000-0000-0000-0000-000000000006', name:'Latarsha Mack',     ini:'LM', av:5, method:'Zelle',         rates:{BMC:35,private:35}, note:'All draws $35'},
+  {id:'a1000000-0000-0000-0000-000000000007', name:'Emma Jean Koonce',  ini:'EK', av:6, method:'ACH or Zelle',  rates:{event:32,private:35}, note:'Event $32/hr · Pvt $35'},
+];
+
+const PP = buildPP();
+let ci = 8; // current period index
+let liveCollections = []; // data from Supabase
+let livePayrollRuns = []; // payroll run statuses
+let epi = 0;
+
+// ═══════════════════════════════════════════════
+// PAY PERIODS
+// ═══════════════════════════════════════════════
+function buildPP(){
+  const raw=[
+    ['2026-01-01','2026-01-09','2026-01-07'],['2026-01-10','2026-01-23','2026-01-21'],
+    ['2026-01-24','2026-02-06','2026-02-04'],['2026-02-07','2026-02-20','2026-02-18'],
+    ['2026-02-21','2026-03-06','2026-03-04'],['2026-03-07','2026-03-20','2026-03-18'],
+    ['2026-03-21','2026-04-03','2026-04-01'],['2026-04-04','2026-04-17','2026-04-15'],
+    ['2026-04-18','2026-05-01','2026-04-29'],['2026-05-02','2026-05-15','2026-05-13'],
+    ['2026-05-16','2026-05-29','2026-05-27'],['2026-05-30','2026-06-12','2026-06-10'],
+    ['2026-06-13','2026-06-26','2026-06-24'],['2026-06-27','2026-07-10','2026-07-08'],
+    ['2026-07-11','2026-07-24','2026-07-22'],['2026-07-25','2026-08-07','2026-08-05'],
+    ['2026-08-08','2026-08-21','2026-08-19'],['2026-08-22','2026-09-04','2026-09-02'],
+    ['2026-09-05','2026-09-18','2026-09-16'],['2026-09-19','2026-10-02','2026-09-30'],
+    ['2026-10-03','2026-10-16','2026-10-14'],['2026-10-17','2026-10-30','2026-10-28'],
+    ['2026-10-31','2026-11-13','2026-11-11'],['2026-11-14','2026-11-27','2026-11-25'],
+    ['2026-11-28','2026-12-11','2026-12-09'],['2026-12-12','2026-12-25','2026-12-23'],
+  ];
+  return raw.map(([s,e,d],i)=>({
+    num:i+1, start:s, end:e, pay:e, dl:d,
+    status: i<8?'paid': i===8?'current': i<=10?'upcoming':'future'
+  }));
+}
+
+function fmt(d){ return new Date(d+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'}); }
+function fmtF(d){ return new Date(d+'T12:00:00').toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'}); }
+function fmtD(d){ const days=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'],dt=new Date(d+'T12:00:00'); return days[dt.getDay()]+', '+fmt(d); }
+
+// ═══════════════════════════════════════════════
+// SUPABASE DATA FETCH
+// ═══════════════════════════════════════════════
+async function fetchPeriodData() {
+  const p = PP[ci];
+
+  // Fetch collections for this pay period
+  const { data: collections, error: ce } = await sb
+    .from('collections')
+    .select('*')
+    .gte('appointment_date', p.start)
+    .lte('appointment_date', p.end);
+
+  if (!ce && collections) liveCollections = collections;
+
+  // Fetch payroll runs for this period
+  const { data: runs, error: re } = await sb
+    .from('payroll_runs')
+    .select('*')
+    .eq('pay_period_id', await getPeriodId(p));
+
+  if (!re && runs) livePayrollRuns = runs;
+}
+
+async function getPeriodId(p) {
+  const { data } = await sb
+    .from('pay_periods')
+    .select('id')
+    .eq('period_number', p.num)
+    .single();
+  return data?.id || null;
+}
+
+// ═══════════════════════════════════════════════
+// COMPUTE DRAWS FROM LIVE DATA
+// ═══════════════════════════════════════════════
+function getPhlebDraws(phlebId) {
+  const draws = liveCollections.filter(c => c.phlebotomist_id === phlebId);
+  return {
+    bmc:     draws.filter(c => c.draw_type === 'BMC').length,
+    private: draws.filter(c => c.draw_type === 'private').reduce((s,c)=>s+(c.draw_count||1),0),
+    event:   draws.filter(c => c.draw_type === 'event').reduce((s,c)=>s+(parseFloat(c.hours_worked)||0),0),
+    total:   draws.length,
+    payout:  draws.reduce((s,c)=>s+(parseFloat(c.gross_payout)||0),0)
+  };
+}
+
+function getPhlebStatus(phlebId) {
+  const run = livePayrollRuns.find(r => r.phlebotomist_id === phlebId);
+  return run?.payment_status || 'pending';
+}
+
+async function updatePayrollStatus(phlebId, newStatus) {
+  const p = PP[ci];
+  const periodId = await getPeriodId(p);
+  if (!periodId) return;
+
+  const ph = PHLEBS.find(p => p.id === phlebId);
+  const draws = getPhlebDraws(phlebId);
+
+  // Upsert payroll run
+  await sb.from('payroll_runs').upsert({
+    pay_period_id:   periodId,
+    phlebotomist_id: phlebId,
+    total_draws:     draws.bmc + draws.private,
+    total_hours:     draws.event,
+    gross_payout:    draws.payout,
+    payment_method:  ph?.method,
+    payment_status:  newStatus,
+    payment_date:    newStatus === 'paid' ? new Date().toISOString().split('T')[0] : null,
+    updated_at:      new Date().toISOString()
+  }, { onConflict: 'pay_period_id,phlebotomist_id' });
+
+  await fetchPeriodData();
+  renderAll();
+}
+
+// ═══════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════
+window.onload = async function(){
+  buildSelect();
+  document.getElementById('periodSel').value = ci;
+  await fetchPeriodData();
+  document.getElementById('loadingOverlay').style.display = 'none';
+  renderAll();
+  buildCal();
+  buildRates();
+  buildNotifs();
+  buildRateSummary();
+};
+
+function buildSelect(){
+  const sel = document.getElementById('periodSel');
+  PP.forEach((p,i)=>{
+    const o = document.createElement('option');
+    o.value = i;
+    o.text = `PP${String(p.num).padStart(2,'0')} — Pay ${fmt(p.pay)}${p.status==='current'?' ★':''}`;
+    sel.appendChild(o);
+  });
+}
+
+async function onPeriodChange(){
+  ci = parseInt(document.getElementById('periodSel').value);
+  document.getElementById('loadingOverlay').style.display = 'flex';
+  await fetchPeriodData();
+  document.getElementById('loadingOverlay').style.display = 'none';
+  renderAll();
+}
+
+async function refreshData(){
+  document.getElementById('loadingOverlay').style.display = 'flex';
+  await fetchPeriodData();
+  document.getElementById('loadingOverlay').style.display = 'none';
+  renderAll();
+}
+
+// ═══════════════════════════════════════════════
+// RENDER
+// ═══════════════════════════════════════════════
+function renderAll(){
+  const p = PP[ci];
+  document.getElementById('tbSub').textContent = `Period ${p.num} · ${fmt(p.start)} – ${fmt(p.end)} · Pay Date: ${fmt(p.pay)} · Live data from Supabase`;
+  document.getElementById('periodLabel').textContent = fmt(p.start)+' – '+fmt(p.end);
+  document.getElementById('alertH').textContent = p.status==='current'?'Current Pay Period — Action Required': p.status==='paid'?'Closed Pay Period':`Upcoming Pay Period ${p.num}`;
+  document.getElementById('alertP').textContent = `Draw log deadline: ${fmtD(p.dl)} by 11:59 PM · Payment releases: ${fmtF(p.pay)}`;
+  renderRoster();
+  updateStats();
+  buildUpcoming();
+  buildTeamSummary();
+}
+
+function renderRoster(){
+  const tbody = document.getElementById('rosterBody');
+  tbody.innerHTML = '';
+  PHLEBS.forEach(ph => {
+    const d = getPhlebDraws(ph.id);
+    const status = getPhlebStatus(ph.id);
+    const isPrem = ph.id === 'a1000000-0000-0000-0000-000000000003';
+    const hasBMC = !!ph.rates.BMC;
+    const hasPvt = !!ph.rates.private;
+    const hasEvt = !!ph.rates.event;
+
+    let pills = '';
+    if(hasBMC) pills += `<span class="tpill tp-bmc">BMC</span>`;
+    if(hasPvt) pills += isPrem ? `<span class="tpill tp-prem">Premium</span>` : `<span class="tpill tp-pvt">Private</span>`;
+    if(hasEvt) pills += `<span class="tpill tp-evt">Event</span>`;
+
+    const payClass = d.payout === 0 ? 'zero' : isPrem ? 'prem' : 'pos';
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>
+        <div class="phleb-cell">
+          <div class="pav pav${ph.av}">${ph.ini}</div>
+          <div><div class="pname">${ph.name}</div><div class="pnote">${ph.note}</div></div>
+        </div>
+      </td>
+      <td>${pills}</td>
+      <td><span class="draw-num ${d.bmc===0?'draw-zero':''}">${hasBMC ? d.bmc : '—'}</span></td>
+      <td><span class="draw-num ${d.private===0?'draw-zero':''}">${hasPvt ? d.private : '—'}</span></td>
+      <td><span class="draw-num ${d.event===0?'draw-zero':''}">${hasEvt ? (d.event||0)+'h' : '—'}</span></td>
+      <td><span class="pval ${payClass}">${d.payout===0?'—':'$'+d.payout.toFixed(2)}</span></td>
+      <td><span style="font-size:11px;color:var(--muted2);">${ph.method}</span></td>
+      <td><button class="sbtn ${sc(status)}" onclick="cycleStatus('${ph.id}')">${sl(status)}</button></td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function sc(s){ return {pending:'sb-pend',paid:'sb-paid',hold:'sb-hold',processing:'sb-pend'}[s]||'sb-pend'; }
+function sl(s){ return {pending:'⏳ Pending',paid:'✓ Paid',hold:'⚠ Hold',processing:'⟳ Processing'}[s]||'Pending'; }
+
+async function cycleStatus(phlebId){
+  const current = getPhlebStatus(phlebId);
+  const next = {pending:'paid', paid:'hold', hold:'pending'}[current] || 'pending';
+  await updatePayrollStatus(phlebId, next);
+}
+
+async function markAllPaid(){
+  for(const ph of PHLEBS){
+    await updatePayrollStatus(ph.id, 'paid');
+  }
+}
+
+// ═══════════════════════════════════════════════
+// STATS
+// ═══════════════════════════════════════════════
+function updateStats(){
+  let total=0, draws=0, bmc=0, pvt=0, paid=0;
+  PHLEBS.forEach(ph=>{
+    const d = getPhlebDraws(ph.id);
+    const status = getPhlebStatus(ph.id);
+    total += d.payout;
+    bmc += d.bmc;
+    pvt += d.private;
+    draws += d.bmc + d.private;
+    if(status === 'paid') paid++;
+  });
+  document.getElementById('stPayout').textContent = '$'+total.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  document.getElementById('stDraws').textContent = draws;
+  document.getElementById('stBMC').textContent = bmc;
+  document.getElementById('stPvt').textContent = pvt;
+  document.getElementById('stPaid').textContent = `${paid} / 7`;
+  document.getElementById('stPaySub').textContent = 'Pay date: '+fmt(PP[ci].pay);
+}
+
+// ═══════════════════════════════════════════════
+// UPCOMING
+// ═══════════════════════════════════════════════
+function buildUpcoming(){
+  const dc={paid:'var(--green)',current:'var(--purple)',upcoming:'var(--yellow)',future:'var(--muted)'};
+  const items = PP.filter((_,i)=>i>=ci&&i<ci+5);
+  document.getElementById('upcomingList').innerHTML = items.map(p=>{
+    const i = PP.indexOf(p);
+    return `<div class="pp-item ${p.status==='current'?'cur':''}" onclick="ci=${i};document.getElementById('periodSel').value=${i};onPeriodChange();">
+      <div class="pp-dot" style="background:${dc[p.status]};"></div>
+      <div><div class="pp-pay">Pay ${fmt(p.pay)}${p.status==='current'?' ★':''}</div><div class="pp-range">${fmt(p.start)} – ${fmt(p.end)}</div></div>
+      <div style="margin-left:auto;font-size:11px;font-weight:600;color:${p.status==='paid'?'var(--muted)':'var(--green)'};">${p.status==='paid'?'Closed':'Upcoming'}</div>
+    </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════
+// RATE SUMMARY
+// ═══════════════════════════════════════════════
+function buildRateSummary(){
+  document.getElementById('rateSummary').innerHTML = PHLEBS.map(ph=>`
+    <div class="ri">
+      <div class="ri-name">${ph.name.split(' ')[0]} ${ph.name.split(' ')[1]?ph.name.split(' ')[1][0]+'.':''}</div>
+      ${Object.entries(ph.rates).map(([t,r])=>`
+        <div class="ri-row">
+          <span class="ri-type">${t==='BMC'?'BMC':t==='event'?'Event/hr':'Private'}</span>
+          <span class="ri-amt">$${r}</span>
+        </div>`).join('')}
+    </div>`).join('');
+}
+
+// ═══════════════════════════════════════════════
+// TEAM SUMMARY
+// ═══════════════════════════════════════════════
+function buildTeamSummary(){
+  const sorted = [...PHLEBS].map(ph=>({ph, d:getPhlebDraws(ph.id)})).sort((a,b)=>b.d.payout-a.d.payout);
+  document.getElementById('teamSummary').innerHTML = sorted.map(({ph,d})=>{
+    const status = getPhlebStatus(ph.id);
+    return `<div class="team-row">
+      <div class="pav pav${ph.av}" style="width:30px;height:30px;font-size:10px;">${ph.ini}</div>
+      <div style="flex:1;min-width:0;"><div class="tname">${ph.name}</div><div class="tnote">${ph.note}</div></div>
+      <div class="tpay">${d.payout===0?'—':'$'+d.payout.toFixed(2)}</div>
+      <button class="sbtn ${sc(status)}" onclick="cycleStatus('${ph.id}')">${sl(status)}</button>
+    </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════
+// NOTIFICATIONS
+// ═══════════════════════════════════════════════
+function buildNotifs(){
+  const ns=[
+    {dot:'var(--red)',title:'Draw Log Deadline — Apr 29',desc:'Period 9 closes. All contractors must submit logs by 11:59 PM.',time:'Due: Wed Apr 29, 2026',badge:'nb-urgent',bl:'URGENT'},
+    {dot:'var(--yellow)',title:'Payment Release — May 1',desc:'Initiate ACH, Zelle, and check payments for all 7 contractors.',time:'Action: Fri May 1, 2026',badge:'nb-soon',bl:'SOON'},
+    {dot:'var(--purple2)',title:'Period 10 Opens — May 2',desc:'Confirm all GHL phlebotomist assignments before period opens.',time:'Fri May 2, 2026',badge:'nb-info',bl:'INFO'},
+    {dot:'var(--purple2)',title:'Log Deadline — Period 10',desc:'Next submission deadline. Send contractor reminders in advance.',time:'Due: Wed May 13, 2026',badge:'nb-info',bl:'INFO'},
+  ];
+  document.getElementById('notifList').innerHTML = ns.map(n=>`
+    <div class="notif-item">
+      <div class="ndot" style="background:${n.dot};margin-top:4px;"></div>
+      <div style="flex:1;">
+        <div class="ntitle">${n.title}</div>
+        <div class="ndesc">${n.desc}</div>
+        <div class="ntime">${n.time}</div>
+      </div>
+      <span class="nbadge ${n.badge}">${n.bl}</span>
+    </div>`).join('');
+}
+
+// ═══════════════════════════════════════════════
+// CALENDAR
+// ═══════════════════════════════════════════════
+function buildCal(){
+  const dc={paid:'var(--green)',current:'var(--purple)',upcoming:'var(--yellow)',future:'var(--muted)'};
+  document.getElementById('calGrid').innerHTML = PP.map((p,i)=>`
+    <div onclick="ci=${i};document.getElementById('periodSel').value=${i};onPeriodChange();showView('roster');"
+      style="background:var(--card2);border:1px solid ${p.status==='current'?'rgba(124,58,237,0.3)':'var(--border)'};border-radius:10px;padding:15px;cursor:pointer;transition:all .15s;${p.status==='paid'?'opacity:.45':''}">
+      <div style="font-size:9px;font-weight:600;color:var(--muted);letter-spacing:.6px;margin-bottom:7px;display:flex;align-items:center;gap:5px;">
+        <span style="width:6px;height:6px;border-radius:50%;background:${dc[p.status]};display:inline-block;"></span>
+        PERIOD ${String(p.num).padStart(2,'0')}
+      </div>
+      <div style="font-size:19px;font-weight:800;color:var(--white);margin-bottom:4px;">${fmt(p.pay)}</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:5px;">${fmt(p.start)} – ${fmt(p.end)}</div>
+      <div style="font-size:10px;color:var(--purple2);">Due: ${fmtD(p.dl)}</div>
+    </div>`).join('');
+}
+
+// ═══════════════════════════════════════════════
+// RATE TABLE
+// ═══════════════════════════════════════════════
+function buildRates(){
+  const tbm={BMC:'tp-bmc',private:'tp-pvt',event:'tp-evt'};
+  const rows=[];
+  PHLEBS.forEach(ph=>{
+    Object.entries(ph.rates).forEach(([t,r])=>{
+      const isPrem = ph.id==='a1000000-0000-0000-0000-000000000003';
+      rows.push(`<tr>
+        <td><div class="phleb-cell"><div class="pav pav${ph.av}">${ph.ini}</div><div class="pname">${ph.name}</div></div></td>
+        <td><span class="tpill ${isPrem?'tp-prem':tbm[t]||'tp-pvt'}">${t.toUpperCase()}</span></td>
+        <td style="font-size:16px;font-weight:800;color:${isPrem?'var(--yellow)':'var(--white)'};">$${r}.00</td>
+        <td style="font-size:12px;color:var(--muted2);">${t==='event'?'per hour':'per draw'}</td>
+        <td style="font-size:12px;color:var(--muted2);">${ph.method}</td>
+        <td style="font-size:12px;color:var(--muted);">${ph.note}</td>
+      </tr>`);
+    });
+  });
+  document.getElementById('rateBody').innerHTML = rows.join('');
+}
+
+// ═══════════════════════════════════════════════
+// EMAIL GENERATOR
+// ═══════════════════════════════════════════════
+function openEmailModal(){
+  epi=0;
+  document.getElementById('emailTabs').innerHTML = PHLEBS.map((ph,i)=>
+    `<button class="mtab ${i===0?'active':''}" onclick="epi=${i};refreshETabs();renderEmail();">${ph.name.split(' ')[0]}</button>`
+  ).join('');
+  renderEmail();
+  document.getElementById('emailModal').classList.add('open');
+}
+function closeModal(){ document.getElementById('emailModal').classList.remove('open'); }
+function refreshETabs(){ document.querySelectorAll('.mtab').forEach((t,i)=>t.classList.toggle('active',i===epi)); }
+
+function renderEmail(){
+  const ph = PHLEBS[epi];
+  const d = getPhlebDraws(ph.id);
+  const p = PP[ci];
+  let br = '';
+  if(ph.rates.BMC && d.bmc>0)         br+=`  Boston Medical:   ${d.bmc} × $${ph.rates.BMC} = $${(d.bmc*ph.rates.BMC).toFixed(2)}\n`;
+  if(ph.rates.private && d.private>0) br+=`  Private Draws:    ${d.private} × $${ph.rates.private} = $${(d.private*ph.rates.private).toFixed(2)}\n`;
+  if(ph.rates.event && d.event>0)     br+=`  Event Hours:      ${d.event} hrs × $${ph.rates.event} = $${(d.event*ph.rates.event).toFixed(2)}\n`;
+  if(!br) br='  No draws logged this period yet.\n';
+
+  document.getElementById('emailContent').textContent =
+`Subject: BMH Payment Notice — ${fmtF(p.pay)} | ${ph.name.split(' ')[0]}
+
+Hi ${ph.name.split(' ')[0]},
+
+This is your official payment notification from Beyond Mobile Health (BMH).
+
+────────────────────────────────────────
+PAY PERIOD ${String(p.num).padStart(2,'0')} · ${fmt(p.start)} – ${fmt(p.end)}
+────────────────────────────────────────
+Log Deadline:   ${fmtD(p.dl)} by 11:59 PM
+Payment Date:   ${fmtF(p.pay)}
+Payment Method: ${ph.method}
+
+────────────────────────────────────────
+YOUR EARNINGS BREAKDOWN
+────────────────────────────────────────
+${br}
+─────────────────────────────────────
+TOTAL PAYOUT:   $${d.payout.toFixed(2)}
+Tax Withheld:   $0.00  (1099 — self-managed)
+NET PAYMENT:    $${d.payout.toFixed(2)}
+
+────────────────────────────────────────
+ACTION REQUIRED
+────────────────────────────────────────
+1. Submit your draw log by ${fmtD(p.dl)} at 11:59 PM.
+   Late submissions roll to the next cycle — no exceptions.
+
+2. Verify your ${ph.method} payment details are current.
+   Updates: operations@beyondmobilehealth.com | 857-557-7197
+
+3. Disputes must be submitted within 48 hours of pay date.
+
+────────────────────────────────────────
+1099 CONTRACTOR REMINDERS
+────────────────────────────────────────
+• BMH does not withhold federal or state taxes on your behalf.
+• You are responsible for quarterly estimated tax payments.
+• Form 1099-NEC issued by Jan 31, 2027 if annual earnings exceed $600.
+• All draws must have verified patient confirmation to be paid.
+
+Thank you for the excellence you bring to every patient.
+BMH's ability to serve 20+ states runs on people like you.
+
+──────────────────────────────
+Jovon Harley, LPN, EMT-B, CMA, PBT
+Founder & CEO — Beyond Mobile Health
+3975 Fair Ridge Dr, Suite 250N, Fairfax, VA 22033
+857-557-7197 | www.beyondmobilehealth.com
+51% Veteran-Owned | SDVOSB-Eligible | 20+ States`;
+}
+
+function copyEmail(){
+  navigator.clipboard.writeText(document.getElementById('emailContent').textContent).then(()=>{
+    const el=document.getElementById('copyOk'); el.style.display='inline';
+    setTimeout(()=>el.style.display='none',3000);
+  });
+}
+
+// ═══════════════════════════════════════════════
+// CSV EXPORT
+// ═══════════════════════════════════════════════
+function exportCSV(){
+  const p = PP[ci];
+  let csv = 'Phlebotomist,BMC Draws,Private Draws,Event Hours,Payout,Payment Method,Status\n';
+  PHLEBS.forEach(ph=>{
+    const d = getPhlebDraws(ph.id);
+    const status = getPhlebStatus(ph.id);
+    csv += `"${ph.name}",${d.bmc},${d.private},${d.event},"$${d.payout.toFixed(2)}","${ph.method}","${status}"\n`;
+  });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  a.download = `BMH_Payroll_PP${p.num}_${p.pay}.csv`;
+  a.click();
+}
+
+// ═══════════════════════════════════════════════
+// NAV
+// ═══════════════════════════════════════════════
+function showView(name, btn){
+  ['roster','calendar','rates'].forEach(v=>{
+    document.getElementById(`view-${v}`).style.display = v===name?'block':'none';
+  });
+  if(btn){ document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active')); btn.classList.add('active'); }
+}
+</script>
+</body>
+</html>
