@@ -417,7 +417,7 @@ var PCOL=['#00c5a1','#7c5cbf','#f5a623','#3b82f6','#e8453c','#2ecc71','#e879f9',
 function pal(id){var h=id?[...id].reduce(function(a,c){return a+c.charCodeAt(0)},0):0;return PAL[h%PAL.length]}
 function ini(n){return(n||'?').split(' ').map(function(w){return w[0]}).join('').slice(0,2).toUpperCase()}
 function pcol(n){var h=[...n].reduce(function(a,c){return a+c.charCodeAt(0)},0);return PCOL[h%PCOL.length]}
-function assignee(p){if(p.assignee&&p.assignee.trim())return p.assignee.trim();return''}
+function assignee(p){if(p.assignee&&p.assignee.trim())return p.assignee.trim();if(p.notes){var m=p.notes.match(/Assigned to:\s*([^|\n]+)/i);if(m)return m[1].trim()}return''}
 
 // ── AUTH ──
 async function doLogin(){
