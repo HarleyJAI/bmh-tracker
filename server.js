@@ -225,7 +225,7 @@ app.get('/webhook/test',async(req,res)=>{
   catch(err){res.status(500).json({error:err.message})}
 });
 app.use('/payroll', payrollWebhook);
-app.use(express.static(path.join(__dirname,'public')));
+app.use(express.static(path.join(__dirname,'public'), { index: false }));
 
 async function start(){
   try{await initDB()}catch(err){console.error('[DB INIT]',err.message);useDB=false}
