@@ -1,1 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>BMH Patient Journey Tracker</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--navy:#0a1628;--teal:#00c5a1;--teal-faint:#e0faf5;--amber:#f5a623;--amber-faint:#fff8eb;--red:#e8453c;--red-faint:#fef2f1;--green:#2ecc71;--green-faint:#edfbf3;--purple:#7c5cbf;--purple-faint:#f3f0ff;--slate:#8896ab;--border:#e4eaf2;--white:#fff;--surface:#f8fafc;--surface2:#f1f5f9;--text:#0d1b2e;--text-mid:#435166;--text-soft:#8896ab;--font:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;--radius:10px;--radius-lg:14px}
+body{font-family:var(--font);background:var(--surface);color:var(--text);min-height:100vh;font-size:14px}
+.topbar{background:var(--navy);padding:14px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
+.brand{display:flex;align-items:center;gap:10px}
+.brand-mark{width:32px;height:32px;background:var(--teal);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px}
+.brand-name{color:#fff;font-size:15px;font-weight:600}
+.brand-sub{color:var(--slate);font-size:11px;text-transform:uppercase;letter-spacing:.04em}
+.topbar-right{display:flex;align-items:center;gap:14px}
+.user-name{color:var(--slate);font-size:13px}
+.logout{color:var(--teal);font-size:13px;text-decoration:none;border:1px solid rgba(0,197,161,.3);padding:6px 12px;border-radius:8px}
+.layout{display:grid;grid-template-columns:200px 1fr;min-height:calc(100vh - 61px)}
+.sidebar{background:var(--white);border-right:1px solid var(--border);padding:20px 0}
+.sidebar-label{font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--text-soft);padding:0 16px 8px}
+.nav-item{display:flex;align-items:center;justify-content:space-between;padding:9px 16px;cursor:pointer;border-left:3px solid transparent;color:var(--text-mid);font-size:13px}
+.nav-item:hover{background:var(--surface)}
+.nav-item.active{background:var(--teal-faint);color:#009e82;border-left-color:var(--teal);font-weight:500}
+.nav-count{background:var(--surface2);color:var(--text-soft);font-size:11px;font-weight:600;padding:2px 7px;border-radius:20px}
+.nav-item.active .nav-count{background:var(--teal);color:var(--navy)}
+.nav-dot{width:8px;height:8px;border-radius:50%;margin-right:8px;display:inline-block}
+.main{padding:24px}
+.page-title{font-size:20px;font-weight:700;color:var(--text);margin-bottom:4px}
+.page-sub{font-size:13px;color:var(--text-soft);margin-bottom:20px}
+.rate-card{background:var(--white);border:1px solid var(--border);border-radius:var(--radius-lg);padding:18px 22px;margin-bottom:20px}
+.rate-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.rate-title{font-size:14px;font-weight:600;color:var(--text)}
+.rate-pct{font-size:24px;font-weight:700;color:var(--teal)}
+.rate-track{height:10px;background:var(--surface2);border-radius:6px;overflow:hidden;display:flex;margin-bottom:10px}
+.rate-legend{display:flex;flex-wrap:wrap;gap:10px}
+.rleg{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-mid)}
+.rleg-dot{width:8px;height:8px;border-radius:50%}
+.rleg-val{font-weight:600;color:var(--text)}
+.stats-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px}
+.stat-card{background:var(--white);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px 16px}
+.stat-label{font-size:11px;color:var(--text-soft);margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em}
+.stat-val{font-size:24px;font-weight:700;color:var(--text)}
+.stat-card.hl{background:var(--navy);border-color:var(--navy)}
+.stat-card.hl .stat-label{color:rgba(255,255,255,.5)}
+.stat-card.hl .stat-val{color:var(--teal)}
+.search-wrap{position:relative;margin-bottom:16px;max-width:360px}
+.search-wrap input{width:100%;background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:9px 12px 9px 36px;font-size:13px;color:var(--text);font-family:var(--font);outline:none}
+.search-wrap input:focus{border-color:var(--teal)}
+.si{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--slate)}
+.patient-grid{display:flex;flex-direction:column;gap:10px}
+.pcard{background:var(--white);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;cursor:pointer}
+.pcard:hover{border-color:#c4cdd9}
+.pcard.open{border-color:var(--teal);box-shadow:0 0 0 3px rgba(0,197,161,.08)}
+.pcard-top{display:flex;align-items:center;gap:12px;padding:14px 18px}
+.av{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;flex-shrink:0}
+.pi{flex:1;min-width:0}
+.pname{font-size:14px;font-weight:600;color:var(--text);margin-bottom:2px}
+.pmeta{font-size:12px;color:var(--text-soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pr{display:flex;align-items:center;gap:10px;flex-shrink:0}
+.sbadge{font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;white-space:nowrap}
+.sb-received{background:var(--surface2);color:var(--text-mid)}
+.sb-scheduled{background:var(--purple-faint);color:var(--purple)}
+.sb-completed{background:var(--green-faint);color:#1a8a4a}
+.sb-incomplete{background:var(--amber-faint);color:#b97c0a}
+.sb-unreachable{background:var(--red-faint);color:var(--red)}
+.chev{color:var(--slate);font-size:12px;transition:transform .2s}
+.pcard.open .chev{transform:rotate(180deg)}
+.jbar{padding:0 18px 12px;display:flex;align-items:center;gap:4px}
+.jseg{height:4px;flex:1;border-radius:3px;background:var(--surface2)}
+.jseg.done{background:var(--teal)}
+.jseg.warn{background:var(--amber)}
+.jseg.danger{background:var(--red)}
+.jseg.sched{background:var(--purple)}
+.jlbl{font-size:10px;color:var(--text-soft);margin-left:8px;white-space:nowrap}
+.detail{display:none;padding:0 18px 18px;border-top:1px solid var(--border)}
+.pcard.open .detail{display:block}
+.detail-grid{padding-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.dsec{background:var(--surface);border-radius:var(--radius);padding:14px}
+.dsec.full{grid-column:1/-1}
+.dsec-title{font-size:10px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--text-soft);margin-bottom:10px}
+.drow{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--border);font-size:13px}
+.drow:last-child{border-bottom:none}
+.dlabel{color:var(--text-soft)}
+.dval{color:var(--text);font-weight:500;text-align:right;max-width:60%}
+.tl{display:flex;flex-direction:column;gap:10px}
+.tl-row{display:flex;align-items:flex-start;gap:10px;font-size:13px}
+.tl-dot{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0;border:2px solid var(--border)}
+.tl-dot.done{background:var(--teal-faint);border-color:var(--teal);color:#009e82}
+.tl-dot.warn{background:var(--amber-faint);border-color:var(--amber);color:var(--amber)}
+.tl-dot.danger{background:var(--red-faint);border-color:var(--red);color:var(--red)}
+.tl-dot.pending{background:var(--surface2);border-color:var(--border);color:var(--slate)}
+.tl-info{flex:1}
+.tl-name{font-weight:500;color:var(--text)}
+.tl-date{font-size:11px;color:var(--text-soft);margin-top:2px}
+.empty{text-align:center;padding:48px 20px;color:var(--text-soft)}
+.empty-icon{font-size:36px;margin-bottom:12px}
+.empty-title{font-size:15px;font-weight:500;color:var(--text-mid);margin-bottom:6px}
+.client-badge{background:#e8f5e9;color:#2e7d32;font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px}
+@media(max-width:700px){.layout{grid-template-columns:1fr}.sidebar{display:none}.stats-strip{grid-template-columns:repeat(2,1fr)}.detail-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="brand">
+    <div class="brand-mark">&#128203;</div>
+    <div><div class="brand-name">BMH Patient Tracker</div><div class="brand-sub">Boston Medical Hospital</div></div>
+  </div>
+  <div class="topbar-right">
+    <span class="client-badge">Client View</span>
+    <span class="user-name" id="userName"></span>
+    <a class="logout" href="/auth/logout">Sign Out</a>
+  </div>
+</div>
+<div class="layout">
+  <div class="sidebar">
+    <div style="padding:0 0 20px">
+      <div class="sidebar-label">Filter by Status</div>
+      <div class="nav-item active" onclick="setFilter('all',this)"><span><span class="nav-dot" style="background:#8896ab"></span>All Patients</span><span class="nav-count" id="cnt-all">0</span></div>
+      <div class="nav-item" onclick="setFilter('received',this)"><span><span class="nav-dot" style="background:#8896ab"></span>Order Received</span><span class="nav-count" id="cnt-received">0</span></div>
+      <div class="nav-item" onclick="setFilter('scheduled',this)"><span><span class="nav-dot" style="background:#7c5cbf"></span>Appt Scheduled</span><span class="nav-count" id="cnt-scheduled">0</span></div>
+      <div class="nav-item" onclick="setFilter('completed',this)"><span><span class="nav-dot" style="background:#2ecc71"></span>Completed</span><span class="nav-count" id="cnt-completed">0</span></div>
+      <div class="nav-item" onclick="setFilter('incomplete',this)"><span><span class="nav-dot" style="background:#f5a623"></span>Not Completed</span><span class="nav-count" id="cnt-incomplete">0</span></div>
+      <div class="nav-item" onclick="setFilter('unreachable',this)"><span><span class="nav-dot" style="background:#e8453c"></span>Unable to Reach</span><span class="nav-count" id="cnt-unreachable">0</span></div>
+    </div>
+  </div>
+  <div class="main">
+    <div class="page-title">Patient Journey Status</div>
+    <div class="page-sub">Real-time appointment tracking — read-only view</div>
+    <div class="rate-card">
+      <div class="rate-header"><div class="rate-title">Overall Completion Rate</div><div class="rate-pct" id="ratePct">0%</div></div>
+      <div class="rate-track" id="rateTrack"></div>
+      <div class="rate-legend" id="rateLegend"></div>
+    </div>
+    <div class="stats-strip" id="statsStrip"></div>
+    <div class="search-wrap"><span class="si">&#128269;</span><input type="text" id="searchInput" placeholder="Search patient name or MRN..." oninput="renderList()"></div>
+    <div class="patient-grid" id="patientGrid"></div>
+  </div>
+</div>
+<script>
+var patients=[], filter='all', openId=null;
+var PAL=[['#e0faf5','#009e82'],['#f3f0ff','#5a3eb5'],['#fff8eb','#b97c0a'],['#fef2f1','#c0392b'],['#e8f5e9','#2e7d32'],['#e3f2fd','#1565c0']];
+function pal(id){var h=id?[...id].reduce(function(a,c){return a+c.charCodeAt(0)},0):0;return PAL[h%PAL.length]}
+function ini(n){return(n||'?').split(' ').map(function(w){return w[0]}).join('').slice(0,2).toUpperCase()}
+function getAssignee(p){if(p.assignee&&p.assignee.trim())return p.assignee.trim();if(p.notes){var m=p.notes.match(/Assigned to:\s*([^|]+)/i);if(m)return m[1].trim()}return''}
 
+function loadMe(){
+  var xhr=new XMLHttpRequest();
+  xhr.open('GET','/api/me');
+  xhr.onload=function(){if(xhr.status===200){var d=JSON.parse(xhr.responseText);document.getElementById('userName').textContent=d.user&&d.user.name?d.user.name:''}};
+  xhr.send();
+}
+
+function loadPatients(){
+  var xhr=new XMLHttpRequest();
+  xhr.open('GET','/api/patients');
+  xhr.onload=function(){if(xhr.status===200){var d=JSON.parse(xhr.responseText);if(Array.isArray(d)){patients=d;renderAll()}}};
+  xhr.send();
+}
+
+function renderRate(){
+  var total=patients.length;
+  if(!total){document.getElementById('ratePct').textContent='0%';document.getElementById('rateTrack').innerHTML='';document.getElementById('rateLegend').innerHTML='';return}
+  var c={completed:0,scheduled:0,received:0,incomplete:0,unreachable:0};
+  patients.forEach(function(p){c[p.status]=(c[p.status]||0)+1});
+  var pct=Math.round(c.completed/total*100);
+  document.getElementById('ratePct').textContent=pct+'%';
+  var segs=[{k:'completed',col:'#00c5a1',l:'Completed'},{k:'scheduled',col:'#7c5cbf',l:'Scheduled'},{k:'received',col:'#8896ab',l:'Received'},{k:'incomplete',col:'#f5a623',l:'Not Completed'},{k:'unreachable',col:'#e8453c',l:'Unable to Reach'}];
+  document.getElementById('rateTrack').innerHTML=segs.map(function(s){return'<div style="width:'+Math.round((c[s.k]||0)/total*100)+'%;background:'+s.col+';height:100%"></div>'}).join('');
+  document.getElementById('rateLegend').innerHTML=segs.map(function(s){return'<div class="rleg"><div class="rleg-dot" style="background:'+s.col+'"></div>'+s.l+': <span class="rleg-val">'+(c[s.k]||0)+'</span></div>'}).join('');
+}
+
+function renderStats(){
+  var c={all:patients.length,received:0,scheduled:0,completed:0,incomplete:0,unreachable:0};
+  patients.forEach(function(p){c[p.status]=(c[p.status]||0)+1});
+  ['all','received','scheduled','completed','incomplete','unreachable'].forEach(function(k){var el=document.getElementById('cnt-'+k);if(el)el.textContent=c[k]||0});
+  var attn=(c.incomplete||0)+(c.unreachable||0);
+  document.getElementById('statsStrip').innerHTML=
+    '<div class="stat-card hl"><div class="stat-label">Total Orders</div><div class="stat-val">'+c.all+'</div></div>'+
+    '<div class="stat-card"><div class="stat-label">Scheduled</div><div class="stat-val">'+c.scheduled+'</div></div>'+
+    '<div class="stat-card"><div class="stat-label">Completed</div><div class="stat-val">'+c.completed+'</div></div>'+
+    '<div class="stat-card"><div class="stat-label">Needs Attention</div><div class="stat-val">'+attn+'</div></div>';
+}
+
+var BADGE={received:'sb-received',scheduled:'sb-scheduled',completed:'sb-completed',incomplete:'sb-incomplete',unreachable:'sb-unreachable'};
+var BLABEL={received:'Order Received',scheduled:'Appt Scheduled',completed:'Completed',incomplete:'Not Completed',unreachable:'Unable to Reach'};
+
+function segCls(s,step){
+  var prog={received:1,scheduled:2,completed:3,incomplete:2,unreachable:1};
+  var steps={received:1,scheduled:2,completed:3};
+  var cur=prog[s]||1,sn=steps[step];
+  if(sn<cur)return'done';
+  if(sn===cur){if(s==='completed')return'done';if(s==='scheduled')return'sched';if(s==='incomplete')return'warn';if(s==='unreachable')return'danger';return'done'}
+  return'';
+}
+
+function renderList(){
+  var q=(document.getElementById('searchInput').value||'').toLowerCase();
+  var list=patients.filter(function(p){
+    if(filter!=='all'&&p.status!==filter)return false;
+    if(q&&![p.name,p.provider||'',p.phone||'',p.notes||'',getAssignee(p)].join(' ').toLowerCase().includes(q))return false;
+    return true;
+  });
+  list.sort(function(a,b){return new Date(b.receivedAt||b.orderDate)-new Date(a.receivedAt||a.orderDate)});
+  var grid=document.getElementById('patientGrid');
+  if(!list.length){grid.innerHTML='<div class="empty"><div class="empty-icon">&#128203;</div><div class="empty-title">No patients found</div></div>';return}
+  grid.innerHTML=list.map(function(p){
+    var bg_fg=pal(p.id);var isOpen=openId===p.id;
+    var a=getAssignee(p);
+    var sl={received:'Waiting to schedule',scheduled:'Appt: '+(p.apptDate||'TBD')+(p.apptTime?' @ '+p.apptTime:''),completed:'Completed: '+(p.completedDate||''),incomplete:'Not completed',unreachable:'Unable to reach'}[p.status]||'';
+    return '<div class="pcard'+(isOpen?' open':'')+'" id="pc-'+p.id+'" onclick="toggleCard(\''+p.id+'\')">'+
+      '<div class="pcard-top">'+
+      '<div class="av" style="background:'+bg_fg[0]+';color:'+bg_fg[1]+'">'+ini(p.name)+'</div>'+
+      '<div class="pi"><div class="pname">'+p.name+'</div><div class="pmeta">'+(p.notes&&p.notes.includes('MRN')?p.notes.split('|')[0].trim()+' &middot; ':'')+''+(a?'Assigned: '+a:'')+'</div></div>'+
+      '<div class="pr"><span class="sbadge '+(BADGE[p.status]||'sb-received')+'">'+(BLABEL[p.status]||p.status)+'</span><span class="chev">&#9660;</span></div>'+
+      '</div>'+
+      '<div class="jbar"><div class="jseg '+segCls(p.status,'received')+'"></div><div class="jseg '+segCls(p.status,'scheduled')+'"></div><div class="jseg '+segCls(p.status,'completed')+'"></div><span class="jlbl">'+sl+'</span></div>'+
+      '<div class="detail" id="det-'+p.id+'" onclick="event.stopPropagation()">'+detailHTML(p)+'</div>'+
+      '</div>';
+  }).join('');
+}
+
+function detailHTML(p){
+  var a=getAssignee(p);
+  var notes=p.notes||'';
+  var mrn=notes.match(/MRN:\s*(\S+)/i);
+  return '<div class="detail-grid">'+
+    '<div class="dsec"><div class="dsec-title">Patient Info</div>'+
+    (mrn?'<div class="drow"><span class="dlabel">MRN</span><span class="dval">'+mrn[1]+'</span></div>':'')+
+    '<div class="drow"><span class="dlabel">Date of Birth</span><span class="dval">'+(p.dob||'--')+'</span></div>'+
+    '<div class="drow"><span class="dlabel">Phone</span><span class="dval">'+(p.phone||'--')+'</span></div>'+
+    '<div class="drow"><span class="dlabel">Phlebotomist</span><span class="dval">'+(a||'Not assigned')+'</span></div>'+
+    '<div class="drow"><span class="dlabel">Order Date</span><span class="dval">'+(p.orderDate||'--')+'</span></div></div>'+
+    '<div class="dsec"><div class="dsec-title">Journey Timeline</div><div class="tl">'+
+    '<div class="tl-row"><div class="tl-dot done">&#10003;</div><div class="tl-info"><div class="tl-name">Order Received</div><div class="tl-date">'+(p.orderDate||'--')+'</div></div></div>'+
+    '<div class="tl-row"><div class="tl-dot '+(p.apptDate?'done':p.status==='incomplete'?'warn':'pending')+'">'+(p.apptDate?'&#10003;':p.status==='incomplete'?'!':'&#9711;')+'</div><div class="tl-info"><div class="tl-name">Appointment</div><div class="tl-date">'+(p.apptDate?p.apptDate+(p.apptTime?' at '+p.apptTime:''):'Not yet scheduled')+'</div></div></div>'+
+    '<div class="tl-row"><div class="tl-dot '+(p.status==='completed'?'done':p.status==='incomplete'?'warn':p.status==='unreachable'?'danger':'pending')+'">'+(p.status==='completed'?'&#10003;':p.status==='incomplete'?'!':p.status==='unreachable'?'&#10007;':'&#9711;')+'</div><div class="tl-info">'+
+    '<div class="tl-name">'+(p.status==='completed'?'Completed':p.status==='incomplete'?'Appointment Not Completed':p.status==='unreachable'?'Unable to Reach Patient':'Pending')+'</div>'+
+    '<div class="tl-date">'+(p.status==='completed'&&p.completedDate?p.completedDate+(p.completedTime?' at '+p.completedTime:''):p.incompleteReason||p.unreachableReason||'--')+'</div>'+
+    '</div></div>'+
+    '</div></div>'+
+    '</div>';
+}
+
+function toggleCard(id){openId=openId===id?null:id;renderList();if(openId){var el=document.getElementById('pc-'+id);if(el)setTimeout(function(){el.scrollIntoView({behavior:'smooth',block:'nearest'})},100)}}
+function setFilter(f,el){filter=f;document.querySelectorAll('.nav-item').forEach(function(n){n.classList.remove('active')});if(el)el.classList.add('active');renderList()}
+function renderAll(){renderStats();renderRate();renderList()}
+
+window.onload=function(){loadMe();loadPatients()};
+setInterval(loadPatients,30000);
+</script>
+</body>
+</html>
