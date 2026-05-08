@@ -112,6 +112,9 @@ function buildPatient(payload){
   const mrn=extractField(payload,GHL_FIELD_MAP.mrn);
   const notes=extractField(payload,GHL_FIELD_MAP.notes);
   const notesOut=mrn?('MRN: '+mrn+(notes?' | '+notes:'')):notes;
+  const rawStatus=extractField(payload,['status','Status','SCHEDULING STATUS'])||'received';
+const statusMap={'Completed':'completed','Not Completed':'incomplete','Unable to Reach':'unreachable','Appt Scheduled':'scheduled','Order Received':'received'};
+const status=statusMap[rawStatus]||'status';
   return {id:crypto.randomUUID(),source:'ghl_webhook',receivedAt:now.toISOString(),name,dob:extractField(payload,GHL_FIELD_MAP.dob),provider:extractField(payload,GHL_FIELD_MAP.provider),service:extractField(payload,GHL_FIELD_MAP.service),phone:extractField(payload,GHL_FIELD_MAP.phone),email:extractField(payload,GHL_FIELD_MAP.email),address:extractField(payload,GHL_FIELD_MAP.address),assignee:extractField(payload,GHL_FIELD_MAP.assignee),orderDate:now.toISOString().slice(0,10),status:'received',apptDate:'',apptTime:'',completedDate:'',completedTime:'',incompleteReason:'',unreachableReason:'',notes:notesOut,_raw:payload};
 }
 
@@ -217,9 +220,13 @@ app.get('/api/me',requireAuth,(req,res)=>res.json({role:req.session.role,user:re
 app.get('/api/health',(req,res)=>res.json({status:'ok',storage:useDB?'supabase':'memory'}));
 
 app.post('/webhook/ghl',async(req,res)=>{
-  try{const p=buildPatient(req.body);await insertPatient(p);console.log('[WEBHOOK]',p.name);res.status(200).json({success:true,patientId:p.id})}
-  catch(err){res.status(500).json({error:err.message})}
-});
+  try{const p=buildPatient(req.body);
+  const mrn=extractField(req.body,['number_14fga','mrn','MRN']);
+  if(mrn&&useDB){
+    const existing=await pool.query('SELECT id FROM patients WHERE notes LIKE $1 LIMIT 1',['MRN: '+mrn+'%']);
+    if(existing.rows.length){await updatePatient(existing.rows[0].id,{status:p.status,notes:p.notes});console.log('[WEBHOOK] Updated:',p.name);return res.status(200).json({success:true,updated:true});}
+  }
+  await insertPatient(p);
 app.get('/webhook/test',async(req,res)=>{
   try{const p=buildPatient({first_name:'Test',last_name:'Patient',date_of_birth:'1980-01-01',phone:'+16175550000',number_14fga:'TEST001'});p.source='test';await insertPatient(p);res.json({message:'Test patient injected',patient:p})}
   catch(err){res.status(500).json({error:err.message})}
