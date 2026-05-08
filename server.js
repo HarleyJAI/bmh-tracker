@@ -112,7 +112,7 @@ function buildPatient(payload){
   const mrn=extractField(payload,GHL_FIELD_MAP.mrn);
   const notes=extractField(payload,GHL_FIELD_MAP.notes);
   const notesOut=mrn?('MRN: '+mrn+(notes?' | '+notes:'')):notes;
-  const rawStatus=extractField(payload,['status','Status','SCHEDULING STATUS'])||'received';
+  
 const statusMap={
   'Completed':'completed',
   'Not Completed':'incomplete',
