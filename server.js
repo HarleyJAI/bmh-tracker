@@ -121,29 +121,30 @@ function buildPatient(payload) {
 
 // ─── Reusable DB Insert ───────────────────────────────────────────────────────
 async function insertPatient(p) {
-  await pool.query(
-    `INSERT INTO patients (
-      id, source, received_at, name, first_name, last_name,
-      dob, provider, service, phone, email, address,
-      assignee, order_date, status, appt_date, appt_time,
-      completed_date, completed_time, incomplete_reason, unreachable_reason,
-      notes, raw, mrn, zip_code, test_type, requested_date,
-      phlebotomist, raw_status, payload
-    ) VALUES (
-      $1,$2,$3,$4,$5,$6,
-      $7,$8,$9,$10,$11,$12,
-      $13,$14,$15,$16,$17,
-      $18,$19,$20,$21,
-      $22,$23,$24,$25,$26,$27,
-      $28,$29,$30
-    )`,
-    [
-      p.id, p.source, p.received_at, p.name, p.first_name, p.last_name,
-      p.dob, p.provider, p.service, p.phone, p.email, p.address,
-      p.assignee, p.order_date, p.status, p.appt_date, p.appt_time,
-      p.completed_date, p.completed_time, p.incomplete_reason, p.unreachable_reason,
-      p.notes, JSON.stringify(p.raw), p.mrn, p.zip_code, p.test_type, p.requested_date,
-      p.phlebotomist, p.raw_status, JSON.stringify(p.payload)
+  const sql = 'INSERT INTO patients (' +
+    'id, source, received_at, name, first_name, last_name, ' +
+    'dob, provider, service, phone, email, address, ' +
+    'assignee, order_date, status, appt_date, appt_time, ' +
+    'completed_date, completed_time, incomplete_reason, unreachable_reason, ' +
+    'notes, raw, mrn, zip_code, test_type, requested_date, ' +
+    'phlebotomist, raw_status, payload' +
+    ') VALUES (' +
+    '$1,$2,$3,$4,$5,$6,' +
+    '$7,$8,$9,$10,$11,$12,' +
+    '$13,$14,$15,$16,$17,' +
+    '$18,$19,$20,$21,' +
+    '$22,$23,$24,$25,$26,$27,' +
+    '$28,$29,$30' +
+    ')';
+  await pool.query(sql, [
+    p.id, p.source, p.received_at, p.name, p.first_name, p.last_name,
+    p.dob, p.provider, p.service, p.phone, p.email, p.address,
+    p.assignee, p.order_date, p.status, p.appt_date, p.appt_time,
+    p.completed_date, p.completed_time, p.incomplete_reason, p.unreachable_reason,
+    p.notes, JSON.stringify(p.raw), p.mrn, p.zip_code, p.test_type, p.requested_date,
+    p.phlebotomist, p.raw_status, JSON.stringify(p.payload)
+  ]);
+
     ]
   );
 }
