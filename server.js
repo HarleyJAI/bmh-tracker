@@ -73,16 +73,24 @@ function extractField(obj, possibleKeys) {
 function normalizeStatus(status) {
   if (!status) return 'received';
   const value = String(status).trim().toLowerCase();
-  if (value.includes('confirm')) return 'confirmed';
+
+  // Exact GHL values first
+  if (value === 'showed')      return 'completed';
+  if (value === 'no_show')     return 'not_completed';
+  if (value === 'no show')     return 'not_completed';
+  if (value === 'confirmed')   return 'scheduled';
+  if (value === 'unconfirmed') return 'received';
+  if (value === 'cancelled')   return 'not_completed';
+  if (value === 'invalid')     return 'not_completed';
+
+  // Fuzzy fallbacks
+  if (value.includes('complet'))  return 'completed';
   if (value.includes('schedule')) return 'scheduled';
-  if (value.includes('no show') || value.includes('noshow')) return 'no_show';
-  if (value.includes('show')) return 'showed';
-  if (value.includes('complet')) return 'completed';
-  if (value.includes('cancel')) return 'cancelled';
-  if (value.includes('miss')) return 'missed_draw';
-  if (value.includes('reach')) return 'unable_to_reach';
-  return value.replace(/\s+/g, '_');
+  if (value.includes('reach'))    return 'unable_to_reach';
+
+  return 'received';
 }
+
 
 // ─── Helper: Build Patient Record from Payload ───────────────────────────────
 function buildPatientRecord(payload) {
