@@ -113,8 +113,20 @@ function buildPatient(payload){
   const notes=extractField(payload,GHL_FIELD_MAP.notes);
   const notesOut=mrn?('MRN: '+mrn+(notes?' | '+notes:'')):notes;
   const rawStatus=extractField(payload,['status','Status','SCHEDULING STATUS'])||'received';
-const statusMap={'Completed':'completed','Not Completed':'incomplete','Unable to Reach':'unreachable','Appt Scheduled':'scheduled','Order Received':'received'};
-const status=statusMap[rawStatus]||'status';
+const statusMap={
+  'Completed':'completed',
+  'Not Completed':'incomplete',
+  'Unable to Reach':'unreachable',
+  'Appt Scheduled':'scheduled',
+  'Order Received':'received',
+  'confirmed':'scheduled',
+  'showed':'completed',
+  'no showed':'incomplete',
+  'invalid':'unreachable',
+  'cancelled':'incomplete',
+  'unconfirmed':'received'
+}
+  const rawStatus=extractField(payload,['status','Status','SCHEDULING STATUS','appointmentStatus','appointment_status'])||'received';
   return {id:crypto.randomUUID(),source:'ghl_webhook',receivedAt:now.toISOString(),name,dob:extractField(payload,GHL_FIELD_MAP.dob),provider:extractField(payload,GHL_FIELD_MAP.provider),service:extractField(payload,GHL_FIELD_MAP.service),phone:extractField(payload,GHL_FIELD_MAP.phone),email:extractField(payload,GHL_FIELD_MAP.email),address:extractField(payload,GHL_FIELD_MAP.address),assignee:extractField(payload,GHL_FIELD_MAP.assignee),orderDate:now.toISOString().slice(0,10),status:'received',apptDate:'',apptTime:'',completedDate:'',completedTime:'',incompleteReason:'',unreachableReason:'',notes:notesOut,_raw:payload};
 }
 
