@@ -99,27 +99,44 @@ function buildPatientRecord(payload) {
     'appointments status', 'appointment_status'
   ]) || 'received';
 
+  const firstName = extractField(payload, ['first_name', 'First Name', 'firstName']) || '';
+  const lastName  = extractField(payload, ['last_name', 'Last Name', 'lastName']) || '';
+  const fullName  = extractField(payload, ['full_name', 'Full Name', 'name', 'Name']) || 
+                    `${firstName} ${lastName}`.trim();
+
   return {
-    id: crypto.randomUUID(),
-    first_name:      extractField(payload, ['first_name', 'First Name', 'firstName']) || '',
-    last_name:       extractField(payload, ['last_name', 'Last Name', 'lastName']) || '',
-    full_name:       extractField(payload, ['full_name', 'Full Name', 'name', 'Name']) || '',
-    phone:           extractField(payload, ['phone', 'Phone', 'mobile', 'Mobile']) || '',
-    email:           extractField(payload, ['email', 'Email']) || '',
-    address:         extractField(payload, ['address', 'Address']) || '',
-    zip_code:        extractField(payload, ['zip', 'Zip', 'zip_code', 'PT_ZipCode']) || '',
-    mrn:             extractField(payload, ['mrn', 'MRN', 'number_14fga']) || '',
-    test_type:       extractField(payload, ['test_type', 'Test Type', 'requested_test']) || '',
-    requested_date:  extractField(payload, ['requested_date', 'Requested Date']) || '',
-    phlebotomist:    extractField(payload, ['phlebotomist', 'Phlebotomist']) || '',
-    raw_status:      rawStatus,
-    status:          normalizeStatus(rawStatus),
-    source:          extractField(payload, ['source', 'Source']) || 'webhook',
-    notes:           extractField(payload, ['notes', 'Notes', 'special_instructions']) || '',
-    payload:         payload,
-    created_at:      new Date().toISOString(),
-    updated_at:      new Date().toISOString()
+    id:               crypto.randomUUID(),
+    source:           extractField(payload, ['source', 'Source']) || 'webhook',
+    received_at:      new Date().toISOString(),
+    name:             fullName,
+    first_name:       firstName,
+    last_name:        lastName,
+    dob:              extractField(payload, ['dob', 'date_of_birth', 'DOB']) || '',
+    provider:         extractField(payload, ['provider', 'ordering_provider', 'Provider']) || '',
+    service:          extractField(payload, ['service', 'test_type', 'Test Type', 'requested_test']) || '',
+    phone:            extractField(payload, ['phone', 'Phone', 'mobile']) || '',
+    email:            extractField(payload, ['email', 'Email']) || '',
+    address:          extractField(payload, ['address', 'Address']) || '',
+    assignee:         extractField(payload, ['phlebotomist', 'Phlebotomist', 'assignee']) || '',
+    order_date:       new Date().toISOString().slice(0, 10),
+    status:           normalizeStatus(rawStatus),
+    appt_date:        '',
+    appt_time:        '',
+    completed_date:   '',
+    completed_time:   '',
+    incomplete_reason: '',
+    unreachable_reason: '',
+    notes:            extractField(payload, ['notes', 'Notes', 'special_instructions']) || '',
+    raw:              payload,
+    mrn:              extractField(payload, ['mrn', 'MRN', 'number_14fga']) || '',
+    zip_code:         extractField(payload, ['zip', 'Zip', 'zip_code', 'PT_ZipCode']) || '',
+    test_type:        extractField(payload, ['test_type', 'Test Type', 'requested_test']) || '',
+    requested_date:   extractField(payload, ['requested_date', 'Requested Date']) || '',
+    phlebotomist:     extractField(payload, ['phlebotomist', 'Phlebotomist']) || '',
+    raw_status:       rawStatus,
+    payload:          payload
   };
+     
 }
 
 // ─── Routes ───────────────────────────────────────────────────────────────────
@@ -150,17 +167,30 @@ app.post('/webhook/ghl', async (req, res) => {
     const patient = buildPatientRecord(payload);
 
     if (useDB && pool) {
-      await pool.query(`
-        INSERT INTO patients (
-          id, first_name, last_name, full_name, phone, email,
-          address, zip_code, mrn, test_type, requested_date,
-          phlebotomist, raw_status, status, source, notes,
-          payload, created_at, updated_at
-        ) VALUES (
-          $1, $2, $3, $4, $5, $6,
-          $7, $8, $9, $10, $11,
-          $12, $13, $14, $15, $16,
-          $17, $18, $19
+      aawait pool.query(`
+  INSERT INTO patients (
+    id, source, received_at, name, first_name, last_name,
+    dob, provider, service, phone, email, address,
+    assignee, order_date, status, appt_date, appt_time,
+    completed_date, completed_time, incomplete_reason,
+    unreachable_reason, notes, raw, mrn, zip_code,
+    test_type, requested_date, phlebotomist, raw_status, payload
+  ) VALUES (
+    $1,$2,$3,$4,$5,$6,
+    $7,$8,$9,$10,$11,$12,
+    $13,$14,$15,$16,$17,
+    $18,$19,$20,
+    $21,$22,$23,$24,$25,
+    $26,$27,$28,$29,$30
+  )
+`, [
+  p.id, p.source, p.received_at, p.name, p.first_name, p.last_name,
+  p.dob, p.provider, p.service, p.phone, p.email, p.address,
+  p.assignee, p.order_date, p.status, p.appt_date, p.appt_time,
+  p.completed_date, p.completed_time, p.incomplete_reason,
+  p.unreachable_reason, p.notes, JSON.stringify(p.raw), p.mrn, p.zip_code,
+  p.test_type, p.requested_date, p.phlebotomist, p.raw_status, JSON.stringify(p.payload)
+]);
         )
       `, [
         patient.id, patient.first_name, patient.last_name, patient.full_name,
@@ -229,16 +259,29 @@ app.post('/api/patients', async (req, res) => {
 
     if (useDB && pool) {
       await pool.query(`
-        INSERT INTO patients (
-          id, first_name, last_name, full_name, phone, email,
-          address, zip_code, mrn, test_type, requested_date,
-          phlebotomist, raw_status, status, source, notes,
-          payload, created_at, updated_at
-        ) VALUES (
-          $1, $2, $3, $4, $5, $6,
-          $7, $8, $9, $10, $11,
-          $12, $13, $14, $15, $16,
-          $17, $18, $19
+  INSERT INTO patients (
+    id, source, received_at, name, first_name, last_name,
+    dob, provider, service, phone, email, address,
+    assignee, order_date, status, appt_date, appt_time,
+    completed_date, completed_time, incomplete_reason,
+    unreachable_reason, notes, raw, mrn, zip_code,
+    test_type, requested_date, phlebotomist, raw_status, payload
+  ) VALUES (
+    $1,$2,$3,$4,$5,$6,
+    $7,$8,$9,$10,$11,$12,
+    $13,$14,$15,$16,$17,
+    $18,$19,$20,
+    $21,$22,$23,$24,$25,
+    $26,$27,$28,$29,$30
+  )
+`, [
+  p.id, p.source, p.received_at, p.name, p.first_name, p.last_name,
+  p.dob, p.provider, p.service, p.phone, p.email, p.address,
+  p.assignee, p.order_date, p.status, p.appt_date, p.appt_time,
+  p.completed_date, p.completed_time, p.incomplete_reason,
+  p.unreachable_reason, p.notes, JSON.stringify(p.raw), p.mrn, p.zip_code,
+  p.test_type, p.requested_date, p.phlebotomist, p.raw_status, JSON.stringify(p.payload)
+]);
         )
       `, [
         patient.id, patient.first_name || '', patient.last_name || '',
@@ -353,17 +396,29 @@ app.get('/webhook/test', async (req, res) => {
 
     if (useDB && pool) {
       await pool.query(`
-        INSERT INTO patients (
-          id, first_name, last_name, full_name, phone, email,
-          address, zip_code, mrn, test_type, requested_date,
-          phlebotomist, raw_status, status, source, notes,
-          payload, created_at, updated_at
-        ) VALUES (
-          $1, $2, $3, $4, $5, $6,
-          $7, $8, $9, $10, $11,
-          $12, $13, $14, $15, $16,
-          $17, $18, $19
-        )
+  INSERT INTO patients (
+    id, source, received_at, name, first_name, last_name,
+    dob, provider, service, phone, email, address,
+    assignee, order_date, status, appt_date, appt_time,
+    completed_date, completed_time, incomplete_reason,
+    unreachable_reason, notes, raw, mrn, zip_code,
+    test_type, requested_date, phlebotomist, raw_status, payload
+  ) VALUES (
+    $1,$2,$3,$4,$5,$6,
+    $7,$8,$9,$10,$11,$12,
+    $13,$14,$15,$16,$17,
+    $18,$19,$20,
+    $21,$22,$23,$24,$25,
+    $26,$27,$28,$29,$30
+  )
+`, [
+  p.id, p.source, p.received_at, p.name, p.first_name, p.last_name,
+  p.dob, p.provider, p.service, p.phone, p.email, p.address,
+  p.assignee, p.order_date, p.status, p.appt_date, p.appt_time,
+  p.completed_date, p.completed_time, p.incomplete_reason,
+  p.unreachable_reason, p.notes, JSON.stringify(p.raw), p.mrn, p.zip_code,
+  p.test_type, p.requested_date, p.phlebotomist, p.raw_status, JSON.stringify(p.payload)
+]);
       `, [
         patient.id, patient.first_name, patient.last_name, patient.full_name,
         patient.phone, patient.email, patient.address, patient.zip_code,
