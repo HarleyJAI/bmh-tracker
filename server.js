@@ -215,8 +215,12 @@ var patient = {
   notes: d.notes || '',
   _raw: null
 };
+  insertPatient(patient).then(function() {
+    res.status(201).json(patient);
+  }).catch(function(err) {
+    res.status(500).json({ success: false, error: err.message });
+  });
 });
-
 app.patch('/api/patients/:id', function(req, res) {
   var id = req.params.id;
   var updates = Object.assign({}, req.body);
