@@ -191,17 +191,30 @@ app.get('/api/patients', function(req, res) {
 });
 
 app.post('/api/patients', function(req, res) {
-  var patient = buildPatient(Object.assign({}, req.body, { source: 'manual' }));
-  if (useDB && pool) {
-    insertPatient(patient).then(function() {
-      res.status(201).json(patient);
-    }).catch(function(err) {
-      res.status(500).json({ success: false, error: err.message });
-    });
-  } else {
-    memPatients.unshift(patient);
-    res.status(201).json(patient);
-  }
+  var d = req.body;
+var patient = {
+  id: d.id || require('crypto').randomUUID(),
+  source: 'manual',
+  receivedAt: d.receivedAt || new Date().toISOString(),
+  name: d.name || 'Unknown',
+  dob: d.dob || '',
+  provider: d.provider || '',
+  service: d.service || '',
+  phone: d.phone || '',
+  email: d.email || '',
+  address: d.address || '',
+  assignee: d.assignee || '',
+  orderDate: d.orderDate || new Date().toISOString().slice(0,10),
+  status: d.status || 'received',
+  apptDate: d.apptDate || '',
+  apptTime: d.apptTime || '',
+  completedDate: d.completedDate || '',
+  completedTime: d.completedTime || '',
+  incompleteReason: d.incompleteReason || '',
+  unreachableReason: d.unreachableReason || '',
+  notes: d.notes || '',
+  _raw: null
+};
 });
 
 app.patch('/api/patients/:id', function(req, res) {
