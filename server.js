@@ -3,6 +3,13 @@
  * Beyond Mobile Health | beyondmobilehealth.com
  * Stack:  Node.js / Express / PostgreSQL (Supabase via pg Pool)
  * Deploy: Railway (via GitHub auto-deploy)
+ *
+ * FIXES APPLIED (2026):
+ *   1. PATCH route — camelCase → snake_case field mapping so updates land correctly
+ *   2. POST /api/patients — normalized to snake_case before calling insertPatient()
+ *   3. console.error logging added to every mutating route catch block
+ *   4. GET /api/patients — configurable limit via ?limit= query param (default 500, max 5000)
+ *   5. Session cookie set secure: true for HTTPS on Railway
  */
 
 var express = require('express');
@@ -42,8 +49,40 @@ app.use(session({
   secret: SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
-  cookie: { secure: false, maxAge: 24 * 60 * 60 * 1000 }
+  // FIX #5: secure: true enforces HTTPS cookie on Railway (HIPAA-relevant)
+  cookie: { secure: true, maxAge: 24 * 60 * 60 * 1000 }
 }));
+
+// ---------------------------------------------------------------------------
+// FIX #1: camelCase → snake_case field map for PATCH and POST routes
+// ---------------------------------------------------------------------------
+var FIELD_MAP = {
+  apptDate:          'appt_date',
+  apptTime:          'appt_time',
+  completedDate:     'completed_date',
+  completedTime:     'completed_time',
+  incompleteReason:  'incomplete_reason',
+  unreachableReason: 'unreachable_reason',
+  orderDate:         'order_date',
+  receivedAt:        'received_at',
+  rawStatus:         'raw_status',
+  testType:          'test_type',
+  requestedDate:     'requested_date',
+  zipCode:           'zip_code',
+  firstName:         'first_name',
+  lastName:          'last_name'
+};
+
+function toSnakeCase(obj) {
+  var result = {};
+  Object.keys(obj).forEach(function(k) {
+    var dbKey = FIELD_MAP[k] || k;
+    result[dbKey] = obj[k];
+  });
+  return result;
+}
+
+// ---------------------------------------------------------------------------
 
 function extractField(obj, keys) {
   if (!obj || typeof obj !== 'object') return null;
@@ -141,8 +180,17 @@ function insertPatient(p) {
   return pool.query(sql, vals);
 }
 
+// ---------------------------------------------------------------------------
+// ROUTES
+// ---------------------------------------------------------------------------
+
 app.get('/health', function(req, res) {
-  res.json({ app: 'BMH Tracker', status: 'running', database: useDB ? 'enabled' : 'memory', timestamp: new Date().toISOString() });
+  res.json({
+    app: 'BMH Tracker',
+    status: 'running',
+    database: useDB ? 'enabled' : 'memory',
+    timestamp: new Date().toISOString()
+  });
 });
 
 app.post('/webhook/ghl', function(req, res) {
@@ -154,7 +202,8 @@ app.post('/webhook/ghl', function(req, res) {
       console.log('[DB] Patient inserted:', patient.id);
       res.status(200).json({ success: true, patientId: patient.id });
     }).catch(function(err) {
-      console.error('[WEBHOOK/GHL ERROR]', err.message);
+      // FIX #3: log insert errors
+      console.error('[WEBHOOK/GHL ERROR] Insert failed:', err.message);
       res.status(500).json({ success: false, error: err.message });
     });
   } else {
@@ -170,6 +219,8 @@ app.post('/webhook', function(req, res) {
     insertPatient(patient).then(function() {
       res.status(200).json({ success: true, patientId: patient.id });
     }).catch(function(err) {
+      // FIX #3: log insert errors
+      console.error('[WEBHOOK ERROR] Insert failed:', err.message);
       res.status(500).json({ success: false, error: err.message });
     });
   } else {
@@ -178,62 +229,104 @@ app.post('/webhook', function(req, res) {
   }
 });
 
+// FIX #4: configurable limit via ?limit= query param (default 500, max 5000)
 app.get('/api/patients', function(req, res) {
+  var limit = Math.min(parseInt(req.query.limit, 10) || 500, 5000);
+
   if (useDB && pool) {
-    pool.query('SELECT * FROM patients ORDER BY received_at DESC LIMIT 500').then(function(result) {
+    pool.query('SELECT * FROM patients ORDER BY received_at DESC LIMIT $1', [limit]).then(function(result) {
       res.json(result.rows);
     }).catch(function(err) {
+      // FIX #3: log read errors
+      console.error('[GET /api/patients ERROR]', err.message);
       res.status(500).json({ success: false, error: err.message });
     });
   } else {
-    res.json(memPatients);
+    res.json(memPatients.slice(0, limit));
   }
 });
 
+// FIX #2: normalize incoming body to snake_case before calling insertPatient()
 app.post('/api/patients', function(req, res) {
-  var d = req.body;
-var patient = {
-  id: d.id || require('crypto').randomUUID(),
-  source: 'manual',
-  receivedAt: d.receivedAt || new Date().toISOString(),
-  name: d.name || 'Unknown',
-  dob: d.dob || '',
-  provider: d.provider || '',
-  service: d.service || '',
-  phone: d.phone || '',
-  email: d.email || '',
-  address: d.address || '',
-  assignee: d.assignee || '',
-  orderDate: d.orderDate || new Date().toISOString().slice(0,10),
-  status: d.status || 'received',
-  apptDate: d.apptDate || '',
-  apptTime: d.apptTime || '',
-  completedDate: d.completedDate || '',
-  completedTime: d.completedTime || '',
-  incompleteReason: d.incompleteReason || '',
-  unreachableReason: d.unreachableReason || '',
-  notes: d.notes || '',
-  _raw: null
-};
-  insertPatient(patient).then(function() {
+  var d = toSnakeCase(req.body || {});
+
+  var patient = {
+    id:                 d.id || crypto.randomUUID(),
+    source:             'manual',
+    received_at:        d.received_at || new Date().toISOString(),
+    name:               d.name || 'Unknown',
+    first_name:         d.first_name || '',
+    last_name:          d.last_name  || '',
+    dob:                d.dob || '',
+    provider:           d.provider || '',
+    service:            d.service || '',
+    phone:              d.phone || '',
+    email:              d.email || '',
+    address:            d.address || '',
+    assignee:           d.assignee || '',
+    order_date:         d.order_date || new Date().toISOString().slice(0, 10),
+    status:             d.status || 'received',
+    appt_date:          d.appt_date || '',
+    appt_time:          d.appt_time || '',
+    completed_date:     d.completed_date || '',
+    completed_time:     d.completed_time || '',
+    incomplete_reason:  d.incomplete_reason || '',
+    unreachable_reason: d.unreachable_reason || '',
+    notes:              d.notes || '',
+    raw:                {},
+    mrn:                d.mrn || '',
+    zip_code:           d.zip_code || '',
+    test_type:          d.test_type || '',
+    requested_date:     d.requested_date || '',
+    phlebotomist:       d.phlebotomist || '',
+    raw_status:         d.raw_status || d.status || 'received',
+    payload:            {}
+  };
+
+  if (useDB && pool) {
+    insertPatient(patient).then(function() {
+      res.status(201).json(patient);
+    }).catch(function(err) {
+      // FIX #3: log manual insert errors
+      console.error('[POST /api/patients ERROR] Insert failed:', err.message);
+      res.status(500).json({ success: false, error: err.message });
+    });
+  } else {
+    memPatients.unshift(patient);
     res.status(201).json(patient);
-  }).catch(function(err) {
-    res.status(500).json({ success: false, error: err.message });
-  });
+  }
 });
+
+// FIX #1: map camelCase keys from frontend to snake_case DB columns before UPDATE
 app.patch('/api/patients/:id', function(req, res) {
   var id = req.params.id;
-  var updates = Object.assign({}, req.body);
-  delete updates.id;
+
+  // Strip id from updates, then normalize keys
+  var rawUpdates = Object.assign({}, req.body);
+  delete rawUpdates.id;
+  var updates = toSnakeCase(rawUpdates);
 
   if (useDB && pool) {
     var keys   = Object.keys(updates);
     var values = Object.values(updates);
-    var fields = keys.map(function(k, i) { return k + ' = $' + (i + 2); }).join(', ');
-    pool.query('UPDATE patients SET ' + fields + ' WHERE id = $1 RETURNING *', [id].concat(values)).then(function(result) {
-      if (result.rows.length === 0) return res.status(404).json({ success: false, error: 'Patient not found' });
+
+    if (keys.length === 0) {
+      return res.status(400).json({ success: false, error: 'No fields to update' });
+    }
+
+    var fields = keys.map(function(k, i) { return '"' + k + '" = $' + (i + 2); }).join(', ');
+
+    pool.query(
+      'UPDATE patients SET ' + fields + ' WHERE id = $1 RETURNING *',
+      [id].concat(values)
+    ).then(function(result) {
+      if (result.rows.length === 0) {
+        return res.status(404).json({ success: false, error: 'Patient not found' });
+      }
       res.json(result.rows[0]);
     }).catch(function(err) {
+      // FIX #3: log patch errors with full detail
+      console.error('[PATCH /api/patients/' + id + ' ERROR]', err.message, '| Fields attempted:', keys.join(', '));
       res.status(500).json({ success: false, error: err.message });
     });
   } else {
@@ -248,15 +341,21 @@ app.delete('/api/patients/:id', function(req, res) {
   var id = req.params.id;
   if (useDB && pool) {
     pool.query('DELETE FROM patients WHERE id = $1 RETURNING id', [id]).then(function(result) {
-      if (result.rows.length === 0) return res.status(404).json({ success: false, error: 'Patient not found' });
+      if (result.rows.length === 0) {
+        return res.status(404).json({ success: false, error: 'Patient not found' });
+      }
       res.json({ success: true, deleted: id });
     }).catch(function(err) {
+      // FIX #3: log delete errors
+      console.error('[DELETE /api/patients/' + id + ' ERROR]', err.message);
       res.status(500).json({ success: false, error: err.message });
     });
   } else {
     var before = memPatients.length;
     memPatients = memPatients.filter(function(p) { return p.id !== id; });
-    if (memPatients.length === before) return res.status(404).json({ success: false, error: 'Patient not found' });
+    if (memPatients.length === before) {
+      return res.status(404).json({ success: false, error: 'Patient not found' });
+    }
     res.json({ success: true, deleted: id });
   }
 });
