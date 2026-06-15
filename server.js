@@ -3,6 +3,7 @@
  * Beyond Mobile Health | beyondmobilehealth.com
  * Stack:  Node.js / Express / PostgreSQL (Supabase via pg Pool)
  * Deploy: Railway (via GitHub auto-deploy)
+ * Updated: Forgot password flow added
  */
 
 var express = require('express');
@@ -16,17 +17,27 @@ var Pool    = pg.Pool;
 var app  = express();
 var PORT = process.env.PORT || 3000;
 
-var DB_URL         = process.env.DATABASE_URL || '';
-var SESSION_SECRET = process.env.SESSION_SECRET || 'bmh-session-secret-2026';
-var ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'bmh-admin-2026';
-var AZURE_TENANT_ID   = process.env.AZURE_TENANT_ID || '';
-var AZURE_CLIENT_ID   = process.env.AZURE_CLIENT_ID || '';
+var DB_URL            = process.env.DATABASE_URL || '';
+var SESSION_SECRET    = process.env.SESSION_SECRET || 'bmh-session-secret-2026';
+var ADMIN_PASSWORD    = process.env.ADMIN_PASSWORD || 'bmh-admin-2026';
+var ADMIN_EMAIL       = process.env.ADMIN_EMAIL    || 'admin@beyondmobilehealth.com';
+var SMTP_HOST         = process.env.SMTP_HOST      || '';
+var SMTP_PORT         = parseInt(process.env.SMTP_PORT || '587', 10);
+var SMTP_USER         = process.env.SMTP_USER      || '';
+var SMTP_PASS         = process.env.SMTP_PASS      || '';
+var AZURE_TENANT_ID   = process.env.AZURE_TENANT_ID   || '';
+var AZURE_CLIENT_ID   = process.env.AZURE_CLIENT_ID   || '';
 var AZURE_CLIENT_SECRET = process.env.AZURE_CLIENT_SECRET || '';
-var BASE_URL       = process.env.BASE_URL || 'https://bmh-tracker-production.up.railway.app';
-var REDIRECT_URI   = BASE_URL + '/auth/callback';
+var BASE_URL          = process.env.BASE_URL || 'https://bmh-tracker-production.up.railway.app';
+var REDIRECT_URI      = BASE_URL + '/auth/callback';
+
+// In-memory reset token store  { token -> { expires: timestamp } }
+var resetTokens = {};
 
 console.log('[ENV] DATABASE_URL present:', !!DB_URL);
 console.log('[ENV] AZURE configured:', !!AZURE_TENANT_ID && !!AZURE_CLIENT_ID);
+console.log('[ENV] ADMIN_PASSWORD length:', ADMIN_PASSWORD.length, '| first char:', ADMIN_PASSWORD[0]);
+console.log('[ENV] SMTP configured:', !!SMTP_HOST && !!SMTP_USER);
 
 var useDB = false;
 var pool  = null;
@@ -118,7 +129,6 @@ function normalizeStatus(status) {
   return 'received';
 }
 
-// Status rank — higher = further along in journey
 var STATUS_RANK = { received: 1, scheduled: 2, incomplete: 2, unreachable: 2, completed: 3 };
 
 function buildPatient(payload) {
@@ -156,9 +166,7 @@ function buildPatient(payload) {
     unreachable_reason: '',
     notes:              notes,
     raw:                payload,
-    mrn:                mrn,
-    first_name:         firstName,
-    last_name:          lastName
+    mrn:                mrn
   };
 }
 
@@ -187,28 +195,295 @@ function insertPatient(p) {
 }
 
 // ---------------------------------------------------------------------------
-// Login page
+// Email helper — sends reset link via SMTP (nodemailer if available)
+// Falls back to console log if SMTP not configured
 // ---------------------------------------------------------------------------
-var LOGIN_PAGE = '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>BMH Patient Tracker</title><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#0a1628;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}.card{background:#fff;border-radius:16px;padding:40px;width:100%;max-width:400px;text-align:center}.mark{width:56px;height:56px;background:#00c5a1;border-radius:12px;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;font-size:26px}h1{font-size:22px;font-weight:700;color:#0a1628;margin-bottom:6px}p{font-size:14px;color:#8896ab;margin-bottom:32px}.ms{display:flex;align-items:center;justify-content:center;gap:12px;width:100%;padding:13px 20px;background:#0078d4;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;text-decoration:none;margin-bottom:20px;font-family:inherit}.ms:hover{background:#106ebe}.div{display:flex;align-items:center;gap:12px;margin:16px 0;color:#8896ab;font-size:12px}.div::before,.div::after{content:"";flex:1;height:1px;background:#e4eaf2}input{width:100%;padding:11px 14px;border:1px solid #e4eaf2;border-radius:8px;font-size:14px;margin-bottom:10px;outline:none;font-family:inherit}input:focus{border-color:#00c5a1}.abtn{width:100%;padding:11px;background:#0a1628;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit}.err{color:#e8453c;font-size:13px;margin-top:10px}</style></head><body><div class="card"><div class="mark">&#128203;</div><h1>BMH Patient Tracker</h1><p>Beyond Mobile Health</p><a class="ms" href="/auth/microsoft"><svg width="20" height="20" viewBox="0 0 21 21"><rect x="1" y="1" width="9" height="9" fill="#f25022"/><rect x="11" y="1" width="9" height="9" fill="#7fba00"/><rect x="1" y="11" width="9" height="9" fill="#00a4ef"/><rect x="11" y="11" width="9" height="9" fill="#ffb900"/></svg>Sign in with Microsoft</a><div class="div">or admin access</div><form method="POST" action="/auth/admin"><input type="password" name="password" placeholder="Admin password" required><button class="abtn" type="submit">Admin Login</button>ERROR_PLACEHOLDER</form></div></body></html>';
+function sendResetEmail(toEmail, resetLink) {
+  console.log('[RESET] Sending reset link to:', toEmail);
+  console.log('[RESET] Link:', resetLink);
 
+  // If SMTP not configured just log — admin can use the link from Railway logs
+  if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS) {
+    console.log('[RESET] No SMTP configured — check Railway logs for the reset link above');
+    return Promise.resolve({ fallback: true });
+  }
+
+  // Try nodemailer if available
+  try {
+    var nodemailer = require('nodemailer');
+    var transporter = nodemailer.createTransport({
+      host: SMTP_HOST,
+      port: SMTP_PORT,
+      secure: SMTP_PORT === 465,
+      auth: { user: SMTP_USER, pass: SMTP_PASS }
+    });
+
+    return transporter.sendMail({
+      from: '"BMH Tracker" <' + SMTP_USER + '>',
+      to: toEmail,
+      subject: 'BMH Tracker — Password Reset',
+      html: '<div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px">' +
+            '<h2 style="color:#0a1628">Password Reset Request</h2>' +
+            '<p style="color:#444;margin:16px 0">Click the button below to reset your admin password. This link expires in 15 minutes.</p>' +
+            '<a href="' + resetLink + '" style="display:inline-block;padding:12px 24px;background:#00c5a1;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;font-size:14px">Reset My Password</a>' +
+            '<p style="color:#999;font-size:12px;margin-top:24px">If you did not request this, ignore this email. Your password will not change.</p>' +
+            '<p style="color:#999;font-size:12px">Link: ' + resetLink + '</p>' +
+            '</div>'
+    });
+  } catch (e) {
+    console.log('[RESET] nodemailer not available:', e.message);
+    return Promise.resolve({ fallback: true });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Login + Forgot Password pages (inline HTML — ES5 style, no template literals)
+// ---------------------------------------------------------------------------
+var LOGIN_PAGE = '<!DOCTYPE html>' +
+'<html><head>' +
+'<meta charset="UTF-8">' +
+'<meta name="viewport" content="width=device-width,initial-scale=1">' +
+'<title>BMH Patient Tracker</title>' +
+'<style>' +
+'*{box-sizing:border-box;margin:0;padding:0}' +
+'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#0a1628;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}' +
+'.card{background:#fff;border-radius:16px;padding:40px;width:100%;max-width:400px;text-align:center}' +
+'.mark{width:56px;height:56px;background:#00c5a1;border-radius:12px;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;font-size:26px}' +
+'h1{font-size:22px;font-weight:700;color:#0a1628;margin-bottom:6px}' +
+'.sub{font-size:14px;color:#8896ab;margin-bottom:32px}' +
+'.ms{display:flex;align-items:center;justify-content:center;gap:12px;width:100%;padding:13px 20px;background:#0078d4;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;text-decoration:none;margin-bottom:20px;font-family:inherit}' +
+'.ms:hover{background:#106ebe}' +
+'.div{display:flex;align-items:center;gap:12px;margin:16px 0;color:#8896ab;font-size:12px}' +
+'.div::before,.div::after{content:"";flex:1;height:1px;background:#e4eaf2}' +
+'input{width:100%;padding:11px 14px;border:1.5px solid #e4eaf2;border-radius:8px;font-size:14px;margin-bottom:10px;outline:none;font-family:inherit;transition:border-color .2s}' +
+'input:focus{border-color:#00c5a1}' +
+'.abtn{width:100%;padding:11px;background:#0a1628;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;transition:background .2s}' +
+'.abtn:hover{background:#1a2d4a}' +
+'.err{color:#e8453c;font-size:13px;margin-top:10px;padding:8px;background:#fff5f5;border-radius:6px;border:1px solid #fecaca}' +
+'.ok{color:#059669;font-size:13px;margin-top:10px;padding:8px;background:#f0fdf4;border-radius:6px;border:1px solid #bbf7d0}' +
+'.forgot{display:block;margin-top:12px;font-size:12px;color:#8896ab;text-decoration:none;transition:color .2s}' +
+'.forgot:hover{color:#00c5a1}' +
+'</style>' +
+'</head><body>' +
+'<div class="card">' +
+'<div class="mark">&#128203;</div>' +
+'<h1>BMH Patient Tracker</h1>' +
+'<p class="sub">Beyond Mobile Health</p>' +
+'<a class="ms" href="/auth/microsoft">' +
+'<svg width="20" height="20" viewBox="0 0 21 21"><rect x="1" y="1" width="9" height="9" fill="#f25022"/><rect x="11" y="1" width="9" height="9" fill="#7fba00"/><rect x="1" y="11" width="9" height="9" fill="#00a4ef"/><rect x="11" y="11" width="9" height="9" fill="#ffb900"/></svg>' +
+'Sign in with Microsoft' +
+'</a>' +
+'<div class="div">or admin access</div>' +
+'<form method="POST" action="/auth/admin">' +
+'<input type="password" name="password" placeholder="Admin password" required>' +
+'<button class="abtn" type="submit">Admin Login</button>' +
+'MSG_PLACEHOLDER' +
+'</form>' +
+'<a class="forgot" href="/forgot-password">Forgot password?</a>' +
+'</div>' +
+'</body></html>';
+
+var FORGOT_PAGE = '<!DOCTYPE html>' +
+'<html><head>' +
+'<meta charset="UTF-8">' +
+'<meta name="viewport" content="width=device-width,initial-scale=1">' +
+'<title>Reset Password — BMH Tracker</title>' +
+'<style>' +
+'*{box-sizing:border-box;margin:0;padding:0}' +
+'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#0a1628;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}' +
+'.card{background:#fff;border-radius:16px;padding:40px;width:100%;max-width:400px;text-align:center}' +
+'.mark{width:56px;height:56px;background:#00c5a1;border-radius:12px;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;font-size:26px}' +
+'h1{font-size:20px;font-weight:700;color:#0a1628;margin-bottom:8px}' +
+'.sub{font-size:13px;color:#8896ab;margin-bottom:28px;line-height:1.5}' +
+'input{width:100%;padding:11px 14px;border:1.5px solid #e4eaf2;border-radius:8px;font-size:14px;margin-bottom:10px;outline:none;font-family:inherit}' +
+'input:focus{border-color:#00c5a1}' +
+'.abtn{width:100%;padding:11px;background:#0a1628;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit}' +
+'.abtn:hover{background:#1a2d4a}' +
+'.err{color:#e8453c;font-size:13px;margin-top:10px;padding:8px;background:#fff5f5;border-radius:6px;border:1px solid #fecaca}' +
+'.ok{color:#059669;font-size:13px;margin-top:10px;padding:8px;background:#f0fdf4;border-radius:6px;border:1px solid #bbf7d0;line-height:1.5}' +
+'.back{display:block;margin-top:16px;font-size:12px;color:#8896ab;text-decoration:none}' +
+'.back:hover{color:#00c5a1}' +
+'</style>' +
+'</head><body>' +
+'<div class="card">' +
+'<div class="mark">&#128274;</div>' +
+'<h1>Reset Admin Password</h1>' +
+'<p class="sub">Enter your admin email address. We will send a reset link to <strong>admin@beyondmobilehealth.com</strong> if it matches.</p>' +
+'<form method="POST" action="/forgot-password">' +
+'<input type="email" name="email" placeholder="Admin email address" required>' +
+'<button class="abtn" type="submit">Send Reset Link</button>' +
+'FORGOT_MSG_PLACEHOLDER' +
+'</form>' +
+'<a class="back" href="/login">&larr; Back to login</a>' +
+'</div>' +
+'</body></html>';
+
+var RESET_PAGE = '<!DOCTYPE html>' +
+'<html><head>' +
+'<meta charset="UTF-8">' +
+'<meta name="viewport" content="width=device-width,initial-scale=1">' +
+'<title>Set New Password — BMH Tracker</title>' +
+'<style>' +
+'*{box-sizing:border-box;margin:0;padding:0}' +
+'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#0a1628;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}' +
+'.card{background:#fff;border-radius:16px;padding:40px;width:100%;max-width:400px;text-align:center}' +
+'.mark{width:56px;height:56px;background:#00c5a1;border-radius:12px;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;font-size:26px}' +
+'h1{font-size:20px;font-weight:700;color:#0a1628;margin-bottom:8px}' +
+'.sub{font-size:13px;color:#8896ab;margin-bottom:28px}' +
+'input{width:100%;padding:11px 14px;border:1.5px solid #e4eaf2;border-radius:8px;font-size:14px;margin-bottom:10px;outline:none;font-family:inherit}' +
+'input:focus{border-color:#00c5a1}' +
+'.abtn{width:100%;padding:11px;background:#0a1628;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit}' +
+'.err{color:#e8453c;font-size:13px;margin-top:10px;padding:8px;background:#fff5f5;border-radius:6px}' +
+'.ok{color:#059669;font-size:13px;margin-top:10px;padding:8px;background:#f0fdf4;border-radius:6px}' +
+'.back{display:block;margin-top:16px;font-size:12px;color:#8896ab;text-decoration:none}' +
+'</style>' +
+'</head><body>' +
+'<div class="card">' +
+'<div class="mark">&#128275;</div>' +
+'<h1>Set New Password</h1>' +
+'<p class="sub">Choose a new admin password.</p>' +
+'<form method="POST" action="/reset-password">' +
+'<input type="hidden" name="token" value="TOKEN_PLACEHOLDER">' +
+'<input type="password" name="password" placeholder="New password" required minlength="8">' +
+'<input type="password" name="confirm" placeholder="Confirm new password" required minlength="8">' +
+'<button class="abtn" type="submit">Update Password</button>' +
+'RESET_MSG_PLACEHOLDER' +
+'</form>' +
+'<a class="back" href="/login">&larr; Back to login</a>' +
+'</div>' +
+'</body></html>';
+
+// ---------------------------------------------------------------------------
+// Login routes
+// ---------------------------------------------------------------------------
 app.get('/login', function(req, res) {
   if (req.session && req.session.role) return res.redirect('/');
-  res.send(LOGIN_PAGE.replace('ERROR_PLACEHOLDER', req.query.error ? '<div class="err">Invalid password. Try again.</div>' : ''));
+  var msg = '';
+  if (req.query.error)   msg = '<div class="err">Invalid password. Try again.</div>';
+  if (req.query.reset)   msg = '<div class="ok">Password updated successfully. You can now log in.</div>';
+  res.send(LOGIN_PAGE.replace('MSG_PLACEHOLDER', msg));
 });
 
 app.post('/auth/admin', function(req, res) {
-  if (req.body.password === ADMIN_PASSWORD) {
+  var entered = (req.body.password || '').trim();
+  var expected = ADMIN_PASSWORD.trim();
+  console.log('[LOGIN] Attempt — entered length:', entered.length, '| expected length:', expected.length, '| match:', entered === expected);
+  if (entered === expected) {
     req.session.role = 'admin';
-    req.session.user = { name: 'Admin', email: 'admin@beyondmobilehealth.com' };
+    req.session.user = { name: 'Admin', email: ADMIN_EMAIL };
     res.redirect('/');
   } else {
     res.redirect('/login?error=1');
   }
 });
 
+// ---------------------------------------------------------------------------
+// Forgot password routes
+// ---------------------------------------------------------------------------
+app.get('/forgot-password', function(req, res) {
+  var msg = '';
+  if (req.query.invalid) msg = '<div class="err">That email does not match the admin account.</div>';
+  res.send(FORGOT_PAGE.replace('FORGOT_MSG_PLACEHOLDER', msg));
+});
+
+app.post('/forgot-password', function(req, res) {
+  var email = (req.body.email || '').trim().toLowerCase();
+  var adminEmail = ADMIN_EMAIL.trim().toLowerCase();
+
+  if (email !== adminEmail) {
+    console.log('[RESET] Email mismatch — entered:', email, '| expected:', adminEmail);
+    return res.redirect('/forgot-password?invalid=1');
+  }
+
+  // Generate token — 32 random bytes, hex encoded
+  var token = crypto.randomBytes(32).toString('hex');
+  // Expires in 15 minutes
+  resetTokens[token] = { expires: Date.now() + 15 * 60 * 1000 };
+
+  var resetLink = BASE_URL + '/reset-password?token=' + token;
+
+  sendResetEmail(ADMIN_EMAIL, resetLink).then(function(result) {
+    if (result && result.fallback) {
+      // SMTP not configured — show link directly on page (development mode)
+      console.log('[RESET] Fallback mode — link shown in response');
+      var directMsg = '<div class="ok">SMTP not configured. Copy this link to reset:<br><br>' +
+                      '<a href="' + resetLink + '" style="word-break:break-all;color:#059669;font-size:11px">' + resetLink + '</a>' +
+                      '<br><br>Or check Railway logs for the link.</div>';
+      res.send(FORGOT_PAGE.replace('FORGOT_MSG_PLACEHOLDER', directMsg));
+    } else {
+      res.send(FORGOT_PAGE.replace('FORGOT_MSG_PLACEHOLDER',
+        '<div class="ok">Reset link sent to ' + ADMIN_EMAIL + '. Check your inbox. Link expires in 15 minutes.</div>'
+      ));
+    }
+  }).catch(function(err) {
+    console.error('[RESET EMAIL ERROR]', err.message);
+    res.send(FORGOT_PAGE.replace('FORGOT_MSG_PLACEHOLDER',
+      '<div class="err">Error sending email: ' + err.message + '. Check Railway logs for the reset link.</div>'
+    ));
+  });
+});
+
+app.get('/reset-password', function(req, res) {
+  var token = req.query.token || '';
+  var entry = resetTokens[token];
+
+  if (!entry || Date.now() > entry.expires) {
+    return res.send(RESET_PAGE
+      .replace('TOKEN_PLACEHOLDER', '')
+      .replace('RESET_MSG_PLACEHOLDER', '<div class="err">This reset link has expired or is invalid. <a href="/forgot-password">Request a new one.</a></div>')
+    );
+  }
+
+  res.send(RESET_PAGE
+    .replace('TOKEN_PLACEHOLDER', token)
+    .replace('RESET_MSG_PLACEHOLDER', '')
+  );
+});
+
+app.post('/reset-password', function(req, res) {
+  var token    = (req.body.token    || '').trim();
+  var password = (req.body.password || '').trim();
+  var confirm  = (req.body.confirm  || '').trim();
+  var entry    = resetTokens[token];
+
+  if (!entry || Date.now() > entry.expires) {
+    return res.send(RESET_PAGE
+      .replace('TOKEN_PLACEHOLDER', token)
+      .replace('RESET_MSG_PLACEHOLDER', '<div class="err">Link expired. <a href="/forgot-password">Request a new one.</a></div>')
+    );
+  }
+
+  if (password.length < 8) {
+    return res.send(RESET_PAGE
+      .replace('TOKEN_PLACEHOLDER', token)
+      .replace('RESET_MSG_PLACEHOLDER', '<div class="err">Password must be at least 8 characters.</div>')
+    );
+  }
+
+  if (password !== confirm) {
+    return res.send(RESET_PAGE
+      .replace('TOKEN_PLACEHOLDER', token)
+      .replace('RESET_MSG_PLACEHOLDER', '<div class="err">Passwords do not match.</div>')
+    );
+  }
+
+  // Update in-memory password AND log the new one so admin can set it in Railway
+  ADMIN_PASSWORD = password;
+  delete resetTokens[token];
+
+  console.log('[RESET] Password updated successfully.');
+  console.log('[RESET] *** NEW PASSWORD SET: ' + password + ' ***');
+  console.log('[RESET] Go to Railway Variables and update ADMIN_PASSWORD to this value to make it permanent.');
+
+  res.redirect('/login?reset=1');
+});
+
+// ---------------------------------------------------------------------------
+// Microsoft SSO
+// ---------------------------------------------------------------------------
 app.get('/auth/microsoft', function(req, res) {
   if (!AZURE_TENANT_ID || !AZURE_CLIENT_ID) {
-    return res.send('<p>Azure SSO not configured.</p>');
+    return res.send('<p style="font-family:sans-serif;padding:20px">Azure SSO not configured.</p>');
   }
   var params = new URLSearchParams({
     client_id: AZURE_CLIENT_ID,
@@ -222,25 +497,24 @@ app.get('/auth/microsoft', function(req, res) {
 });
 
 app.get('/auth/callback', function(req, res) {
-  var code = req.query.code;
+  var code  = req.query.code;
   var error = req.query.error;
   if (error || !code) return res.redirect('/login?error=1');
   fetch('https://login.microsoftonline.com/' + AZURE_TENANT_ID + '/oauth2/v2.0/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
-      client_id: AZURE_CLIENT_ID,
+      client_id:     AZURE_CLIENT_ID,
       client_secret: AZURE_CLIENT_SECRET,
-      code: code,
-      redirect_uri: REDIRECT_URI,
-      grant_type: 'authorization_code'
+      code:          code,
+      redirect_uri:  REDIRECT_URI,
+      grant_type:    'authorization_code'
     })
   }).then(function(r) { return r.json(); }).then(function(td) {
     if (td.error) throw new Error(td.error_description);
     var payload = JSON.parse(Buffer.from(td.id_token.split('.')[1], 'base64').toString());
     req.session.role = 'client';
     req.session.user = { name: payload.name || payload.preferred_username, email: payload.email || payload.preferred_username };
-    // Log access
     if (useDB && pool) {
       pool.query('INSERT INTO access_log (id,email,name,role,action,logged_in_at,ip) VALUES ($1,$2,$3,$4,$5,$6,$7)',
         [crypto.randomUUID(), req.session.user.email, req.session.user.name, 'client', 'login', new Date().toISOString(), req.headers['x-forwarded-for'] || req.ip]
@@ -259,7 +533,7 @@ app.get('/auth/logout', function(req, res) {
 });
 
 // ---------------------------------------------------------------------------
-// Root route — serve correct portal
+// Root route
 // ---------------------------------------------------------------------------
 app.get('/', requireAuth, function(req, res) {
   if (req.session.role === 'admin') {
@@ -341,7 +615,6 @@ app.patch('/api/patients/:id', requireAdmin, function(req, res) {
     pool.query('UPDATE patients SET ' + fields + ' WHERE id = $1 RETURNING *', [id].concat(values))
       .then(function(result) {
         if (result.rows.length === 0) return res.status(404).json({ success: false, error: 'Patient not found' });
-        // Log update
         if (req.session && req.session.user) {
           pool.query('INSERT INTO access_log (id,email,name,role,action,record_id,logged_in_at,ip) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)',
             [crypto.randomUUID(), req.session.user.email, req.session.user.name, req.session.role, 'update_patient', id, new Date().toISOString(), req.headers['x-forwarded-for'] || req.ip]
@@ -385,7 +658,7 @@ app.get('/api/health', function(req, res) {
 });
 
 // ---------------------------------------------------------------------------
-// Webhooks — upsert by MRN to prevent duplicates and status regression
+// Webhooks
 // ---------------------------------------------------------------------------
 app.post('/webhook/ghl', function(req, res) {
   var payload = req.body || {};
@@ -393,15 +666,13 @@ app.post('/webhook/ghl', function(req, res) {
   var mrn = patient.mrn;
 
   if (useDB && pool) {
-    // Check if patient already exists by MRN
     var mrnCheck = mrn
       ? pool.query('SELECT id, status FROM patients WHERE mrn = $1 LIMIT 1', [mrn])
       : Promise.resolve({ rows: [] });
 
     mrnCheck.then(function(existing) {
       if (existing.rows.length > 0) {
-        // Patient exists — only update if new status is same rank or higher
-        var existingId = existing.rows[0].id;
+        var existingId     = existing.rows[0].id;
         var existingStatus = existing.rows[0].status;
         var newRank = STATUS_RANK[patient.status] || 1;
         var curRank = STATUS_RANK[existingStatus] || 1;
@@ -419,7 +690,6 @@ app.post('/webhook/ghl', function(req, res) {
           res.status(200).json({ success: true, skipped: true, reason: 'status_downgrade_prevented' });
         }
       } else {
-        // New patient — insert
         return insertPatient(patient).then(function() {
           console.log('[WEBHOOK] Inserted new patient:', patient.id);
           res.status(200).json({ success: true, inserted: true, patientId: patient.id });
@@ -456,7 +726,7 @@ app.get('/webhook/test', function(req, res) {
 });
 
 // ---------------------------------------------------------------------------
-// Static files — index: false so auth routes handle /
+// Static files
 // ---------------------------------------------------------------------------
 app.use(express.static(path.join(__dirname, 'public'), { index: false }));
 
