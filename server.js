@@ -579,7 +579,7 @@ app.get('/auth/logout', function(req, res) {
 // ---------------------------------------------------------------------------
 app.get('/', requireAuth, function(req, res) {
   if (req.session.role === 'admin') {
-    return res.sendFile(path.join(__dirname, 'public', 'index.html'));
+    return res.redirect('/dispatch');
   }
   res.sendFile(path.join(__dirname, 'public', 'client.html'));
 });
@@ -762,6 +762,86 @@ app.get('/api/orders', requireAuth, function(req, res) {
     console.error('[GET /api/orders ERROR]', err.message);
     res.status(500).json({ success: false, error: err.message });
   });
+});
+
+// ---------------------------------------------------------------------------
+// Dispatch dashboard (admin only). Full org-tagged operational view.
+// ---------------------------------------------------------------------------
+app.get('/dispatch', requireAdmin, function(req, res) {
+  res.sendFile(path.join(__dirname, 'public', 'dispatch.html'));
+});
+
+app.get('/api/dispatch', requireAdmin, function(req, res) {
+  var limit = Math.min(parseInt(req.query.limit, 10) || 1000, 5000);
+  if (!useDB || !pool) return res.json([]);
+
+  loadOrgs().then(function(orgs) {
+    var byId = {};
+    orgs.forEach(function(o) { byId[o.id] = o; });
+    return pool.query(
+      'SELECT o.*, ' +
+      '       p.full_name, p.first_name, p.last_name, p.mrn, p.dob, p.phone, ' +
+      '       p.language, p.language_other, p.interpreter_needed, ' +
+      '       p.alt_contact_name, p.alt_contact_title, p.home_address ' +
+      '  FROM orders o JOIN people p ON p.id = o.person_id ' +
+      ' ORDER BY o.requested_date ASC NULLS LAST LIMIT $1', [limit]
+    ).then(function(r) {
+      // Shape matches what dispatch.html's fromDb() expects (nested `people`).
+      res.json(r.rows.map(function(row) {
+        var org = byId[row.org_id] || null;
+        return Object.assign({}, row, {
+          people: {
+            full_name: row.full_name, first_name: row.first_name, last_name: row.last_name,
+            mrn: row.mrn, dob: row.dob, phone: row.phone, language: row.language,
+            language_other: row.language_other, interpreter_needed: row.interpreter_needed,
+            alt_contact_name: row.alt_contact_name, alt_contact_title: row.alt_contact_title,
+            home_address: row.home_address
+          },
+          org_name:  org ? (org.short_name || org.name) : null,
+          org_color: org ? org.tag_color : '#8896ab',
+          org_bg:    org ? org.tag_bg : '#f1f5f9'
+        });
+      }));
+    });
+  }).catch(function(err) {
+    console.error('[GET /api/dispatch ERROR]', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  });
+});
+
+// Status updates write through Railway so every change is audit-logged.
+app.patch('/api/dispatch/:id', requireAdmin, function(req, res) {
+  var id = req.params.id;
+  if (!useDB || !pool) return res.status(503).json({ success: false, error: 'No database' });
+
+  // Whitelist — never let the browser set arbitrary columns.
+  var ALLOWED = ['status', 'assignee', 'phlebotomist_id', 'completed_date',
+                 'requested_date', 'access_notes', 'best_time', 'updated_at'];
+  var updates = {};
+  Object.keys(req.body || {}).forEach(function(k) {
+    if (ALLOWED.indexOf(k) !== -1) updates[k] = req.body[k];
+  });
+  var keys = Object.keys(updates);
+  if (!keys.length) return res.status(400).json({ success: false, error: 'No valid fields' });
+
+  var fields = keys.map(function(k, i) { return '"' + k + '" = $' + (i + 2); }).join(', ');
+  pool.query('UPDATE orders SET ' + fields + ' WHERE id = $1 RETURNING *', [id].concat(Object.values(updates)))
+    .then(function(result) {
+      if (!result.rows.length) return res.status(404).json({ success: false, error: 'Order not found' });
+      if (req.session && req.session.user) {
+        pool.query(
+          'INSERT INTO access_log (id,email,name,role,action,record_id,logged_in_at,ip) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)',
+          [crypto.randomUUID(), req.session.user.email, req.session.user.name, req.session.role,
+           'update_order:' + keys.join(','), id, new Date().toISOString(),
+           req.headers['x-forwarded-for'] || req.ip]
+        ).catch(function(e) { console.log('[ACCESS LOG]', e.message); });
+      }
+      res.json(result.rows[0]);
+    })
+    .catch(function(err) {
+      console.error('[PATCH /api/dispatch ERROR]', err.message);
+      res.status(500).json({ success: false, error: err.message });
+    });
 });
 
 app.get('/api/me', requireAuth, function(req, res) {
