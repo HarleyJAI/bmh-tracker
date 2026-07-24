@@ -75,6 +75,48 @@ function requireAuth(req, res, next) {
 }
 
 // ---------------------------------------------------------------------------
+// Multi-tenant org resolution
+//
+// SECURITY MODEL:
+//   - A client's org is derived SERVER-SIDE from their authenticated email
+//     domain. The browser never supplies it and cannot override it.
+//   - DEFAULT DENY: an unrecognized domain resolves to null, which returns
+//     ZERO rows. Never all rows.
+//   - Orders with org_id IS NULL belong to nobody and are admin-only.
+// ---------------------------------------------------------------------------
+var ORG_CACHE = { at: 0, rows: [] };
+
+function loadOrgs() {
+  if (!useDB || !pool) return Promise.resolve([]);
+  if (Date.now() - ORG_CACHE.at < 60000) return Promise.resolve(ORG_CACHE.rows);
+  return pool.query('SELECT id,name,short_name,email_domains,tag_color,tag_bg FROM organizations WHERE active = true')
+    .then(function(r) { ORG_CACHE = { at: Date.now(), rows: r.rows }; return r.rows; })
+    .catch(function(e) { console.error('[ORGS]', e.message); return ORG_CACHE.rows; });
+}
+
+function orgForEmail(email, orgs) {
+  if (!email || email.indexOf('@') === -1) return null;
+  var domain = email.split('@').pop().toLowerCase().trim();
+  for (var i = 0; i < orgs.length; i++) {
+    var d = orgs[i].email_domains || [];
+    for (var j = 0; j < d.length; j++) {
+      if (String(d[j]).toLowerCase() === domain) return orgs[i];
+    }
+  }
+  return null; // unmapped domain -> deny
+}
+
+// Orders status -> client-facing tracker status
+var STATUS_MAP = {
+  received:  'received',
+  assigned:  'scheduled',
+  completed: 'completed',
+  lab:       'completed',
+  noshow:    'incomplete',
+  unreach:   'unreachable'
+};
+
+// ---------------------------------------------------------------------------
 // Field mapping
 // ---------------------------------------------------------------------------
 var FIELD_MAP = {
@@ -649,8 +691,93 @@ app.delete('/api/patients/:id', requireAdmin, function(req, res) {
   }
 });
 
+// ---------------------------------------------------------------------------
+// NEW: org-scoped orders feed (reads orders + people, not the legacy
+// `patients` table). Returns the same camelCase shape client.html expects.
+// ---------------------------------------------------------------------------
+app.get('/api/orders', requireAuth, function(req, res) {
+  var limit = Math.min(parseInt(req.query.limit, 10) || 500, 5000);
+  if (!useDB || !pool) return res.json([]);
+
+  loadOrgs().then(function(orgs) {
+    var isAdmin = req.session.role === 'admin';
+    var org = isAdmin ? null : orgForEmail(req.session.user && req.session.user.email, orgs);
+
+    // DEFAULT DENY — a client whose domain maps to no org sees nothing.
+    if (!isAdmin && !org) {
+      console.warn('[TENANCY] denied, unmapped domain:', req.session.user && req.session.user.email);
+      return res.json([]);
+    }
+
+    var sql =
+      'SELECT o.id, o.request_no, o.status, o.requested_date, o.completed_date, ' +
+      '       o.provider, o.provider_npi, o.service_address, o.access_notes, ' +
+      '       o.assignee, o.received_at, o.is_recurring, o.occurrence_index, ' +
+      '       o.occurrence_total, o.billing_ready, o.org_id, ' +
+      '       p.full_name, p.first_name, p.last_name, p.mrn, p.dob, p.phone, ' +
+      '       p.language, p.interpreter_needed ' +
+      '  FROM orders o JOIN people p ON p.id = o.person_id ';
+    var params = [];
+    if (!isAdmin) { sql += ' WHERE o.org_id = $1 '; params.push(org.id); }
+    params.push(limit);
+    sql += ' ORDER BY o.requested_date DESC NULLS LAST LIMIT $' + params.length;
+
+    return pool.query(sql, params).then(function(r) {
+      var byId = {};
+      orgs.forEach(function(o) { byId[o.id] = o; });
+      res.json(r.rows.map(function(row) {
+        var o = byId[row.org_id] || null;
+        return {
+          id:            row.id,
+          name:          row.full_name || ((row.first_name || '') + ' ' + (row.last_name || '')).trim(),
+          mrn:           row.mrn || '',
+          dob:           row.dob ? String(row.dob).slice(0, 10) : '',
+          phone:         row.phone || '',
+          language:      row.language || 'English',
+          interpreter:   !!row.interpreter_needed,
+          provider:      row.provider || '',
+          assignee:      row.assignee || '',
+          address:       row.service_address || '',
+          accessNotes:   row.access_notes || '',
+          requestNo:     row.request_no || 1,
+          recurring:     !!row.is_recurring,
+          occIndex:      row.occurrence_index,
+          occTotal:      row.occurrence_total,
+          orderDate:     row.received_at ? String(row.received_at).slice(0, 10) : '',
+          apptDate:      row.requested_date ? String(row.requested_date).slice(0, 10) : '',
+          apptTime:      '',
+          completedDate: row.completed_date ? String(row.completed_date).slice(0, 10) : '',
+          receivedAt:    row.received_at,
+          status:        STATUS_MAP[row.status] || 'received',
+          orgId:         row.org_id || null,
+          orgName:       o ? (o.short_name || o.name) : null,
+          orgColor:      o ? o.tag_color : '#8896ab',
+          orgBg:         o ? o.tag_bg : '#f1f5f9',
+          notes:         (row.mrn ? 'MRN: ' + row.mrn : '') +
+                         (row.assignee ? ' | Assigned to: ' + row.assignee : '')
+        };
+      }));
+    });
+  }).catch(function(err) {
+    console.error('[GET /api/orders ERROR]', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  });
+});
+
 app.get('/api/me', requireAuth, function(req, res) {
-  res.json({ role: req.session.role, user: req.session.user });
+  loadOrgs().then(function(orgs) {
+    var isAdmin = req.session.role === 'admin';
+    var org = isAdmin ? null : orgForEmail(req.session.user && req.session.user.email, orgs);
+    res.json({
+      role: req.session.role,
+      user: req.session.user,
+      org:  isAdmin ? { id: null, name: 'All Organizations', admin: true }
+                    : (org ? { id: org.id, name: org.name, short: org.short_name,
+                               color: org.tag_color, bg: org.tag_bg } : null)
+    });
+  }).catch(function() {
+    res.json({ role: req.session.role, user: req.session.user, org: null });
+  });
 });
 
 app.get('/api/health', function(req, res) {
