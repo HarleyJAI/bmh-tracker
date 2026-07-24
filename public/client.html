@@ -96,6 +96,7 @@ body{font-family:var(--font);background:var(--surface);color:var(--text);min-hei
 .empty{text-align:center;padding:48px 20px;color:var(--text-soft)}
 .empty-icon{font-size:36px;margin-bottom:12px}
 .empty-title{font-size:15px;font-weight:500;color:var(--text-mid);margin-bottom:6px}
+.orgtag{display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:5px;margin-left:8px;letter-spacing:.03em;text-transform:uppercase;vertical-align:1px}
 .client-badge{background:#e8f5e9;color:#2e7d32;font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px}
 @media(max-width:700px){.layout{grid-template-columns:1fr}.sidebar{display:none}.stats-strip{grid-template-columns:repeat(2,1fr)}.detail-grid{grid-template-columns:1fr}}
 </style>
@@ -147,13 +148,13 @@ function getAssignee(p){if(p.assignee&&p.assignee.trim())return p.assignee.trim(
 function loadMe(){
   var xhr=new XMLHttpRequest();
   xhr.open('GET','/api/me');
-  xhr.onload=function(){if(xhr.status===200){var d=JSON.parse(xhr.responseText);document.getElementById('userName').textContent=d.user&&d.user.name?d.user.name:''}};
+  xhr.onload=function(){if(xhr.status===200){var d=JSON.parse(xhr.responseText);document.getElementById('userName').textContent=d.user&&d.user.name?d.user.name:'';if(d.org&&d.org.name){var b=document.querySelector('.brand-sub');if(b)b.textContent=d.org.name}}};
   xhr.send();
 }
 
 function loadPatients(){
   var xhr=new XMLHttpRequest();
-  xhr.open('GET','/api/patients');
+  xhr.open('GET','/api/orders');
   xhr.onload=function(){if(xhr.status===200){var d=JSON.parse(xhr.responseText);if(Array.isArray(d)){patients=d;renderAll()}}};
   xhr.send();
 }
@@ -211,7 +212,7 @@ function renderList(){
     return '<div class="pcard'+(isOpen?' open':'')+'" id="pc-'+p.id+'" onclick="toggleCard(\''+p.id+'\')">'+
       '<div class="pcard-top">'+
       '<div class="av" style="background:'+bg_fg[0]+';color:'+bg_fg[1]+'">'+ini(p.name)+'</div>'+
-      '<div class="pi"><div class="pname">'+p.name+'</div><div class="pmeta">'+(p.notes&&p.notes.includes('MRN')?p.notes.split('|')[0].trim()+' &middot; ':'')+''+(a?'Assigned: '+a:'')+'</div></div>'+
+      '<div class="pi"><div class="pname">'+p.name+(p.orgName?'<span class="orgtag" style="background:'+p.orgBg+';color:'+p.orgColor+'">'+p.orgName+'</span>':'')+'</div><div class="pmeta">'+(p.notes&&p.notes.includes('MRN')?p.notes.split('|')[0].trim()+' &middot; ':'')+''+(a?'Assigned: '+a:'')+'</div></div>'+
       '<div class="pr"><span class="sbadge '+(BADGE[p.status]||'sb-received')+'">'+(BLABEL[p.status]||p.status)+'</span><span class="chev">&#9660;</span></div>'+
       '</div>'+
       '<div class="jbar"><div class="jseg '+segCls(p.status,'received')+'"></div><div class="jseg '+segCls(p.status,'scheduled')+'"></div><div class="jseg '+segCls(p.status,'completed')+'"></div><span class="jlbl">'+sl+'</span></div>'+
