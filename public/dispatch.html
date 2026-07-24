@@ -108,26 +108,39 @@
   .badge-notify { font-size: 11px; color: var(--ok); font-weight: 700; }
   .badge-notify.off { color: var(--ink-soft); font-weight: 500; }
 
-  /* Status select */
+  /* Status select — solid colored pill, color set per-status below */
   .status-wrap { position: relative; }
   select.status {
     font-family: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer;
-    border: 1.5px solid var(--line); border-radius: 9px; padding: 8px 30px 8px 12px;
-    appearance: none; -webkit-appearance: none; background: var(--card);
+    border: none; border-radius: 9px; padding: 8px 30px 8px 12px;
+    appearance: none; -webkit-appearance: none;
     color: #fff; transition: .15s; min-width: 172px;
+    background-color: var(--s-received); /* default, overridden per status */
+    box-shadow: 0 1px 2px rgba(10,22,40,.12);
   }
-  select.status:focus { outline: none; box-shadow: 0 0 0 3px rgba(47,127,184,.18); }
+  select.status:hover { filter: brightness(1.06); }
+  select.status:focus { outline: none; box-shadow: 0 0 0 3px rgba(47,127,184,.25); }
   .status-wrap::after {
     content: "▾"; position: absolute; right: 11px; top: 50%; transform: translateY(-50%);
-    color: rgba(255,255,255,.85); pointer-events: none; font-size: 11px;
+    color: rgba(255,255,255,.9); pointer-events: none; font-size: 11px;
   }
   select.status option { background: #fff; color: var(--ink); font-weight: 600; }
-  .st-received { background: var(--s-received); border-color: var(--s-received); }
-  .st-assigned { background: var(--s-assigned); border-color: var(--s-assigned); }
-  .st-completed { background: var(--s-completed); border-color: var(--s-completed); }
-  .st-lab { background: var(--s-lab); border-color: var(--s-lab); }
-  .st-noshow { background: var(--s-noshow); border-color: var(--s-noshow); }
-  .st-unreach { background: var(--s-unreach); border-color: var(--s-unreach); }
+  /* !important guarantees the status color wins over the base background */
+  select.st-received  { background-color: var(--s-received)  !important; }
+  select.st-assigned  { background-color: var(--s-assigned)  !important; }
+  select.st-completed { background-color: var(--s-completed) !important; }
+  select.st-lab       { background-color: var(--s-lab)       !important; }
+  select.st-noshow    { background-color: var(--s-noshow)    !important; }
+  select.st-unreach   { background-color: var(--s-unreach)   !important; }
+
+  /* Row-level tint — faint wash of the status color across the whole row */
+  tr.row-completed { background: linear-gradient(90deg, rgba(30,122,83,.05), transparent 60%); }
+  tr.row-assigned  { background: linear-gradient(90deg, rgba(192,125,30,.06), transparent 60%); }
+  tr.row-lab       { background: linear-gradient(90deg, rgba(18,80,122,.05), transparent 60%); }
+  tr.row-noshow    { background: linear-gradient(90deg, rgba(178,58,58,.08), transparent 55%); }
+  tr.row-unreach   { background: linear-gradient(90deg, rgba(138,79,176,.07), transparent 55%); }
+  tr.row-noshow td:first-child  { box-shadow: inset 3px 0 0 var(--s-noshow); }
+  tr.row-unreach td:first-child { box-shadow: inset 3px 0 0 var(--s-unreach); }
 
   .rq-badge{display:inline-block;color:#fff;font-size:10.5px;font-weight:800;border-radius:5px;
     padding:1px 6px;margin-right:7px;vertical-align:1px;letter-spacing:.02em}
@@ -472,7 +485,7 @@ function renderTable(){
     const flag = r.billingReady
       ? `<span class="ok-chip">✓ ready</span>`
       : `<span class="warn-chip" title="Missing: ${r.missing.join(', ')}">⚠ ${r.missing.length} missing</span>`;
-    return `<tr data-id="${r.id}">
+    return `<tr data-id="${r.id}" class="row-${r.status}">
       <td>
         <div class="pt-name">${rq}${r.last}, ${r.first} ${lang}${orgChip}</div>
         <div class="pt-meta mono">${refOf(r.id)}${r.dob?` · DOB ${fmt(r.dob)}`:""}</div>
