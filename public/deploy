@@ -1,0 +1,63 @@
+# Deploy — BMH Tracker multi-tenant + dispatch
+
+Repo: `HarleyJAI/bmh-tracker` · branch `main` · Railway auto-deploys on push.
+
+## Files
+
+| File | Goes to | Action |
+|---|---|---|
+| `server.js` | repo root | replace |
+| `public/dispatch.html` | `public/` | **new file** |
+| `public/client.html` | `public/` | replace |
+
+## Steps
+
+1. Copy the three files into your local clone of `bmh-tracker`
+2. `git add . && git commit -m "Multi-tenant orgs + dispatch dashboard"`
+3. `git push origin main`
+4. Railway deploys automatically (~1 min)
+
+## After deploy
+
+| URL | Who | Sees |
+|---|---|---|
+| `/` → `/dispatch` | Admin login | All 408 orders, org-tagged |
+| `/` | Microsoft SSO | Their org's orders only |
+| `/api/health` | Public | Status check |
+
+## What changed
+
+**Security**
+- Supabase anon key removed from the dispatch dashboard entirely — it now
+  calls `/api/dispatch`, and Railway holds the credential server-side
+- `/dispatch` and `/api/dispatch` are behind `requireAdmin`
+- Status updates go through Railway and are written to `access_log`
+- PATCH whitelists columns; browser cannot set arbitrary fields
+
+**Multi-tenancy**
+- Client org resolved server-side from SSO email domain
+- SQL `WHERE org_id = $1` enforces isolation
+- Unmapped domain → zero rows (default deny)
+- Orders with `org_id IS NULL` are admin-only, invisible to all clients
+
+**Unchanged / still working**
+- `/api/patients` — legacy route, untouched
+- `public/index.html` — old admin view, still reachable directly
+- `/webhook/ghl` — still writes to `patients` (next build)
+
+## Onboarding a new client
+
+```sql
+insert into organizations (id, name, short_name, email_domains, tag_color, tag_bg)
+values ('clientid', 'Client Full Name', 'Short',
+        array['theirdomain.com'], '#hexcolor', '#lightbg');
+```
+
+Then stamp their orders with `org_id = 'clientid'` at intake.
+No code changes required.
+
+## Known open item
+
+The GHL webhook still writes to the legacy `patients` table. Those orders
+appear in neither the dispatch dashboard nor the client tracker. Closing
+that loop is the next build.
