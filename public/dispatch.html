@@ -156,6 +156,43 @@
     border-radius:5px;padding:2px 8px;font-size:11px;font-weight:800;cursor:help}
   .org-chip{display:inline-block;font-size:10px;font-weight:800;padding:1px 7px;border-radius:5px;margin-left:7px;letter-spacing:.03em;text-transform:uppercase;vertical-align:1px}
   .empty-state { padding: 60px 20px; text-align: center; color: var(--ink-soft); }
+  th.sortable { cursor: pointer; user-select: none; }
+  th.sortable:hover { color: var(--brand); }
+  .sort-arrow { font-size: 11px; opacity: .7; margin-left: 2px; }
+  tr.row-click { cursor: pointer; }
+  tr.row-click:hover { background: rgba(47,127,184,.06) !important; }
+
+  /* Order detail overlay */
+  .detail-overlay {
+    position: fixed; inset: 0; background: rgba(10,22,40,.45);
+    display: none; align-items: flex-start; justify-content: center;
+    z-index: 100; padding: 40px 16px; overflow-y: auto;
+  }
+  .detail-overlay.show { display: flex; }
+  .detail-panel {
+    background: var(--card); border-radius: 16px; max-width: 640px; width: 100%;
+    box-shadow: 0 20px 60px rgba(10,22,40,.3); overflow: hidden;
+  }
+  .detail-panel-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 20px; border-bottom: 1px solid var(--line);
+  }
+  .detail-panel-head h3 { font-size: 14px; font-weight: 700; color: var(--ink); }
+  .detail-close {
+    border: none; background: var(--surface-2); width: 30px; height: 30px;
+    border-radius: 8px; cursor: pointer; font-size: 16px; color: var(--ink-soft);
+  }
+  .detail-close:hover { background: var(--line); }
+  #detailBody { padding: 20px; }
+  .dt-head { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 18px; gap: 12px; }
+  .dt-name { font-size: 17px; font-weight: 700; color: var(--ink); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .dt-sub { font-size: 12px; color: var(--ink-soft); margin-top: 4px; }
+  .dt-status { color: #fff; font-size: 12px; font-weight: 700; padding: 5px 12px; border-radius: 8px; white-space: nowrap; }
+  .dt-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 20px; }
+  .dt-field.wide { grid-column: 1 / -1; }
+  .dt-label { font-size: 10.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--ink-soft); margin-bottom: 4px; }
+  .dt-val { font-size: 13.5px; color: var(--ink); line-height: 1.45; }
+  @media(max-width:560px){ .dt-grid { grid-template-columns: 1fr; } }
   .empty-state .ico { font-size: 40px; margin-bottom: 12px; }
 
   .flash {
@@ -212,7 +249,7 @@
             <th>Patient</th>
             <th>MRN</th>
             <th>Tests</th>
-            <th>Draw date</th>
+            <th id="dateSortHead" class="sortable">Draw date <span id="dateSortArrow" class="sort-arrow">↓</span></th>
             <th>Physician</th>
             <th>Billing</th>
             <th>Status</th>
@@ -235,15 +272,24 @@
 
 <div class="flash" id="flash"><span class="dot"></span><span id="flashMsg"></span></div>
 
+<div class="detail-overlay" id="detailOverlay">
+  <div class="detail-panel">
+    <div class="detail-panel-head">
+      <h3>Order detail</h3>
+      <button class="detail-close" id="detailClose">✕</button>
+    </div>
+    <div id="detailBody"></div>
+  </div>
+</div>
 <script>
 // ---------- Status model ----------
 const STATUSES = [
-  {id:"received",  label:"Received order",        cls:"st-received"},
-  {id:"assigned",  label:"Assigned order",        cls:"st-assigned"},
-  {id:"completed", label:"Completed order",       cls:"st-completed"},
-  {id:"lab",       label:"Dropped off at lab",    cls:"st-lab"},
-  {id:"noshow",    label:"No show",               cls:"st-noshow"},
-  {id:"unreach",   label:"Unable to reach patient",cls:"st-unreach"},
+  {id:"received",  label:"Received order",        cls:"st-received",  color:"#5b7488"},
+  {id:"assigned",  label:"Assigned order",        cls:"st-assigned",  color:"#c07d1e"},
+  {id:"completed", label:"Completed order",       cls:"st-completed", color:"#1e7a53"},
+  {id:"lab",       label:"Dropped off at lab",    cls:"st-lab",       color:"#12507a"},
+  {id:"noshow",    label:"No show",               cls:"st-noshow",    color:"#b23a3a"},
+  {id:"unreach",   label:"Unable to reach patient",cls:"st-unreach",  color:"#8a4fb0"},
 ];
 const EXCEPTION = ["noshow","unreach"];
 function statusOf(id){ return STATUSES.find(s=>s.id===id) || STATUSES[0]; }
@@ -255,6 +301,7 @@ const API_HEAD = { "Content-Type": "application/json" };
 
 let rows = [];
 let filter = { type:"all", status:"all", q:"" };
+let dateSortDir = "desc"; // newest draw date first by default
 
 // Map an `orders` row (joined to people) -> dashboard row shape
 function fromDb(r){
@@ -462,7 +509,15 @@ function refOf(id){
 }
 
 function renderTable(){
-  const list = rows.filter(matches);
+  let list = rows.filter(matches);
+  // Date sort — undated rows always sink to the bottom regardless of direction.
+  list.sort((a,b)=>{
+    const da = a.requestedDate, db = b.requestedDate;
+    if(!da && !db) return 0;
+    if(!da) return 1;
+    if(!db) return -1;
+    return dateSortDir==="asc" ? da.localeCompare(db) : db.localeCompare(da);
+  });
   const tbody = document.getElementById("tbody");
   const empty = document.getElementById("emptyState");
   if(!list.length){ tbody.innerHTML=""; empty.style.display="block"; return; }
@@ -485,7 +540,7 @@ function renderTable(){
     const flag = r.billingReady
       ? `<span class="ok-chip">✓ ready</span>`
       : `<span class="warn-chip" title="Missing: ${r.missing.join(', ')}">⚠ ${r.missing.length} missing</span>`;
-    return `<tr data-id="${r.id}" class="row-${r.status}">
+    return `<tr data-id="${r.id}" class="row-${r.status} row-click">
       <td>
         <div class="pt-name">${rq}${r.last}, ${r.first} ${lang}${orgChip}</div>
         <div class="pt-meta mono">${refOf(r.id)}${r.dob?` · DOB ${fmt(r.dob)}`:""}</div>
@@ -524,7 +579,6 @@ function renderTable(){
         renderKpis();
         notifyFlash(row, old, next);
       } catch(e){
-        // revert on failure
         sel.value = old;
         sel.className = "status " + statusOf(old).cls;
         document.getElementById("flashMsg").textContent = "Update failed — " + e.message;
@@ -535,7 +589,61 @@ function renderTable(){
       }
     };
   });
+
+  // Clicking a row opens the order detail — but not when using the status dropdown.
+  tbody.querySelectorAll("tr.row-click").forEach(tr=>{
+    tr.addEventListener("click", e=>{
+      if(e.target.closest(".status-wrap")) return; // let the dropdown work
+      openDetail(tr.dataset.id);
+    });
+  });
 }
+
+function openDetail(id){
+  const r = rows.find(x=>x.id===id);
+  if(!r) return;
+  const due = dueBucket(r.requestedDate);
+  const st = statusOf(r.status);
+  const testList = r.tests.length ? r.tests.map(t=>`<span class="tag">${t}</span>`).join("") : '<span class="pt-meta">—</span>';
+  const billing = r.billingReady
+    ? `<span class="ok-chip">✓ ready to bill</span>`
+    : `<span class="warn-chip">⚠ missing: ${r.missing.join(', ')||'—'}</span>`;
+  const recur = r.recurring ? `Weekly · occurrence ${r.occIndex||1} of ${r.occTotal||1}` : "One-time draw";
+  const langLine = r.language && r.language!=="English"
+    ? `${r.language==="Other"?(r.languageOther||"Other"):r.language}${r.interpreter?' · interpreter needed':''}` : "English";
+
+  document.getElementById("detailBody").innerHTML = `
+    <div class="dt-head">
+      <div>
+        <div class="dt-name">${rqBadge(r.requestNo)} ${r.last}, ${r.first}
+          ${r.orgName?`<span class="org-chip" style="background:${r.orgBg};color:${r.orgColor}">${r.orgName}</span>`:""}</div>
+        <div class="dt-sub mono">${refOf(r.id)}${r.mrn&&r.mrn!=="—"?` · MRN ${r.mrn}`:""}</div>
+      </div>
+      <span class="dt-status" style="background:${st.color}">${st.label}</span>
+    </div>
+    <div class="dt-grid">
+      ${dtField("Draw date", r.requestedDate?`${fmt(r.requestedDate)} <span class="due ${due.cls}">${due.label}</span>`:"Not scheduled")}
+      ${dtField("Schedule", recur)}
+      ${dtField("Date of birth", r.dob?fmt(r.dob):"—")}
+      ${dtField("Phone", r.phone||"—")}
+      ${dtField("Language", langLine)}
+      ${dtField("Tests ordered", testList, true)}
+      ${dtField("Service address", r.address||'<span class="warn-chip">⚠ missing</span>', true)}
+      ${dtField("Access notes", r.accessNotes?`🔑 ${escapeHtml(r.accessNotes)}`:"—", true)}
+      ${dtField("Best time", r.bestTime||"—")}
+      ${dtField("Physician", `${r.physician}${r.npi&&r.npi!=="—"?` · NPI ${r.npi}`:""}`)}
+      ${dtField("Assigned to", r.assignee||'<span class="pt-meta">Unassigned</span>')}
+      ${dtField("Billing", billing, true)}
+      ${dtField("Submitted", `${r.submittedDate?fmt(r.submittedDate):"—"} by ${r.submittedBy}`, true)}
+      ${dtField("Notify", r.notify||"Off")}
+    </div>`;
+  document.getElementById("detailOverlay").classList.add("show");
+}
+function dtField(label, val, wide){
+  return `<div class="dt-field${wide?' wide':''}"><div class="dt-label">${label}</div><div class="dt-val">${val}</div></div>`;
+}
+function rqBadge(n){ return `<span class="rq-badge" style="background:${reqColor(n)}">R${n}</span>`; }
+function closeDetail(){ document.getElementById("detailOverlay").classList.remove("show"); }
 
 function syncChips(){
   document.querySelectorAll("[data-type]").forEach(c=>{
@@ -592,6 +700,20 @@ document.getElementById("search").addEventListener("input", e=>{
   filter.q = e.target.value.trim();
   renderTable();
 });
+
+// Click "Draw date" header to toggle asc/desc
+document.getElementById("dateSortHead").addEventListener("click", ()=>{
+  dateSortDir = dateSortDir==="asc" ? "desc" : "asc";
+  document.getElementById("dateSortArrow").textContent = dateSortDir==="asc" ? "↑" : "↓";
+  renderTable();
+});
+
+// Detail overlay close: X button, click outside, or Escape
+document.getElementById("detailClose").addEventListener("click", closeDetail);
+document.getElementById("detailOverlay").addEventListener("click", e=>{
+  if(e.target.id==="detailOverlay") closeDetail();
+});
+document.addEventListener("keydown", e=>{ if(e.key==="Escape") closeDetail(); });
 document.getElementById("seedBtn").onclick = ()=>{
   filter={type:"all",status:"all",q:""};
   document.getElementById("search").value="";
