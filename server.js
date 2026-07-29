@@ -18,6 +18,8 @@ var app  = express();
 var PORT = process.env.PORT || 3000;
 
 var DB_URL            = process.env.DATABASE_URL || '';
+var SUPABASE_URL         = process.env.SUPABASE_URL || 'https://hnamuztnddupqasikrfi.supabase.co';
+var SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || '';
 var SESSION_SECRET    = process.env.SESSION_SECRET || 'bmh-session-secret-2026';
 var ADMIN_PASSWORD    = process.env.ADMIN_PASSWORD || 'bmh-admin-2026';
 var ADMIN_EMAIL       = process.env.ADMIN_EMAIL    || 'admin@beyondmobilehealth.com';
@@ -35,6 +37,7 @@ var REDIRECT_URI      = BASE_URL + '/auth/callback';
 var resetTokens = {};
 
 console.log('[ENV] DATABASE_URL present:', !!DB_URL);
+console.log('[ENV] SUPABASE_SERVICE_KEY present:', !!SUPABASE_SERVICE_KEY);
 console.log('[ENV] AZURE configured:', !!AZURE_TENANT_ID && !!AZURE_CLIENT_ID);
 console.log('[ENV] ADMIN_PASSWORD length:', ADMIN_PASSWORD.length, '| first char:', ADMIN_PASSWORD[0]);
 console.log('[ENV] SMTP configured:', !!SMTP_HOST && !!SMTP_USER);
@@ -713,7 +716,7 @@ app.get('/api/orders', requireAuth, function(req, res) {
       'SELECT o.id, o.request_no, o.status, o.requested_date, o.completed_date, ' +
       '       o.provider, o.provider_npi, o.service_address, o.access_notes, ' +
       '       o.assignee, o.received_at, o.is_recurring, o.occurrence_index, ' +
-      '       o.occurrence_total, o.billing_ready, o.org_id, ' +
+      '       o.occurrence_total, o.billing_ready, o.org_id, o.requisition_path, ' +
       '       p.full_name, p.first_name, p.last_name, p.mrn, p.dob, p.phone, ' +
       '       p.language, p.interpreter_needed ' +
       '  FROM orders o JOIN people p ON p.id = o.person_id ';
@@ -753,6 +756,7 @@ app.get('/api/orders', requireAuth, function(req, res) {
           orgName:       o ? (o.short_name || o.name) : null,
           orgColor:      o ? o.tag_color : '#8896ab',
           orgBg:         o ? o.tag_bg : '#f1f5f9',
+          requisitionPath: row.requisition_path || null,
           notes:         (row.mrn ? 'MRN: ' + row.mrn : '') +
                          (row.assignee ? ' | Assigned to: ' + row.assignee : '')
         };
@@ -767,6 +771,53 @@ app.get('/api/orders', requireAuth, function(req, res) {
 // ---------------------------------------------------------------------------
 // Dispatch dashboard (admin only). Full org-tagged operational view.
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Requisition retrieval — brokered server-side so the private file is never
+// exposed via a browser key. Staff/admin get any; a client is org-scoped to
+// their own patients only. Returns a short-lived signed URL.
+// ---------------------------------------------------------------------------
+app.get('/api/requisition/:orderId', requireAuth, function(req, res){
+  var orderId = req.params.orderId;
+  if(!useDB || !pool) return res.status(503).json({ error:'No database' });
+  if(!SUPABASE_SERVICE_KEY) return res.status(500).json({ error:'Storage not configured' });
+
+  pool.query('SELECT id, org_id, requisition_path FROM orders WHERE id = $1', [orderId])
+    .then(function(r){
+      if(!r.rows.length) return res.status(404).json({ error:'Order not found' });
+      var order = r.rows[0];
+      if(!order.requisition_path) return res.status(404).json({ error:'No requisition on file' });
+
+      // Client role: confirm this order belongs to their org before releasing PHI.
+      if(req.session.role !== 'admin'){
+        return loadOrgs().then(function(orgs){
+          var org = orgForEmail(req.session.user && req.session.user.email, orgs);
+          if(!org || order.org_id !== org.id){
+            console.warn('[REQ] denied cross-org access', req.session.user && req.session.user.email, orderId);
+            return res.status(403).json({ error:'Not authorized for this record' });
+          }
+          return signAndReturn(order.requisition_path, res);
+        });
+      }
+      return signAndReturn(order.requisition_path, res);
+    })
+    .catch(function(e){ console.error('[REQ ERROR]', e.message); res.status(500).json({ error:e.message }); });
+});
+
+function signAndReturn(objectPath, res){
+  // Supabase Storage: create a signed URL valid for 5 minutes.
+  return fetch(SUPABASE_URL + '/storage/v1/object/sign/requisitions/' + encodeURI(objectPath), {
+    method:'POST',
+    headers:{ 'Authorization':'Bearer ' + SUPABASE_SERVICE_KEY, 'Content-Type':'application/json' },
+    body: JSON.stringify({ expiresIn: 300 })
+  })
+  .then(function(r){ return r.json().then(function(j){ return { ok:r.ok, j:j }; }); })
+  .then(function(o){
+    if(!o.ok || !o.j.signedURL) return res.status(502).json({ error:'Could not sign URL' });
+    res.json({ url: SUPABASE_URL + '/storage/v1' + o.j.signedURL });
+  })
+  .catch(function(e){ console.error('[SIGN ERROR]', e.message); res.status(500).json({ error:e.message }); });
+}
+
 app.get('/dispatch', requireAdmin, function(req, res) {
   res.sendFile(path.join(__dirname, 'public', 'dispatch.html'));
 });
