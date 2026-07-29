@@ -231,7 +231,8 @@ function detailHTML(p){
     '<div class="drow"><span class="dlabel">Date of Birth</span><span class="dval">'+(p.dob||'--')+'</span></div>'+
     '<div class="drow"><span class="dlabel">Phone</span><span class="dval">'+(p.phone||'--')+'</span></div>'+
     '<div class="drow"><span class="dlabel">Phlebotomist</span><span class="dval">'+(a||'Not assigned')+'</span></div>'+
-    '<div class="drow"><span class="dlabel">Order Date</span><span class="dval">'+(p.orderDate||'--')+'</span></div></div>'+
+    '<div class="drow"><span class="dlabel">Order Date</span><span class="dval">'+(p.orderDate||'--')+'</span></div>'+
+    (p.requisitionPath?'<div class="drow"><span class="dlabel">Requisition</span><span class="dval"><button onclick="viewReq(event,\''+p.id+'\')" style="background:#00c5a1;color:#fff;border:none;border-radius:7px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer">📄 View / print</button></span></div>':'')+'</div>'+
     '<div class="dsec"><div class="dsec-title">Journey Timeline</div><div class="tl">'+
     '<div class="tl-row"><div class="tl-dot done">&#10003;</div><div class="tl-info"><div class="tl-name">Order Received</div><div class="tl-date">'+(p.orderDate||'--')+'</div></div></div>'+
     '<div class="tl-row"><div class="tl-dot '+(p.apptDate?'done':p.status==='incomplete'?'warn':'pending')+'">'+(p.apptDate?'&#10003;':p.status==='incomplete'?'!':'&#9711;')+'</div><div class="tl-info"><div class="tl-name">Appointment</div><div class="tl-date">'+(p.apptDate?p.apptDate+(p.apptTime?' at '+p.apptTime:''):'Not yet scheduled')+'</div></div></div>'+
@@ -249,6 +250,8 @@ function renderAll(){renderStats();renderRate();renderList()}
 
 window.onload=function(){loadMe();loadPatients()};
 setInterval(loadPatients,30000);
+function viewReq(e,id){e.stopPropagation();fetch('/api/requisition/'+encodeURIComponent(id),{credentials:'same-origin'}).then(function(r){return r.json().then(function(j){return{ok:r.ok,j:j}})}).then(function(o){if(!o.ok||!o.j.url){alert(o.j.error||'Could not open requisition');return}window.open(o.j.url,'_blank','noopener')}).catch(function(err){alert('Error: '+err.message)})}
+
 </script>
 </body>
 </html>
