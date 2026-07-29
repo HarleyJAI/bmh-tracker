@@ -3,1452 +3,744 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Lab Intake — Beyond Mobile Health</title>
+<title>Dispatch Dashboard — Beyond Mobile Health</title>
 <style>
   :root {
-    --ink: #0e2438;
-    --ink-soft: #45607a;
-    --paper: #f6f8fa;
-    --card: #ffffff;
-    --line: #dbe4ec;
-    --brand: #12507a;
-    --brand-deep: #0d3a5a;
-    --amber: #d98a2b;
-    --ok: #1e7a53;
-    --err: #b23a3a;
-    --focus: #2f7fb8;
+    --ink: #0e2438; --ink-soft: #45607a; --paper: #f6f8fa; --card: #ffffff;
+    --line: #dbe4ec; --brand: #12507a; --brand-deep: #0d3a5a; --amber: #d98a2b;
+    --ok: #1e7a53; --err: #b23a3a; --focus: #2f7fb8;
+    /* status colors */
+    --s-received:#5b7488; --s-assigned:#c07d1e; --s-completed:#1e7a53;
+    --s-lab:#12507a; --s-noshow:#b23a3a; --s-unreach:#8a4fb0;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  html, body { height: 100%; }
   body {
     font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    background: var(--paper);
-    color: var(--ink);
-    -webkit-font-smoothing: antialiased;
-    overflow: hidden;
+    background: var(--paper); color: var(--ink); -webkit-font-smoothing: antialiased;
+    font-size: 14px;
   }
 
-  /* Progress bar */
-  #progressWrap {
-    position: fixed; top: 0; left: 0; right: 0; height: 4px;
-    background: var(--line); z-index: 50;
-  }
-  #progressBar {
-    height: 100%; width: 0%;
-    background: linear-gradient(90deg, var(--brand), var(--amber));
-    transition: width .45s cubic-bezier(.16,.84,.44,1);
-  }
-
-  /* Header */
   header {
-    position: fixed; top: 14px; left: 0; right: 0; z-index: 40;
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 0 clamp(18px, 5vw, 60px);
-    pointer-events: none;
+    background: var(--card); border-bottom: 1px solid var(--line);
+    padding: 16px clamp(16px,4vw,36px); display: flex; align-items: center;
+    justify-content: space-between; gap: 16px; flex-wrap: wrap;
+    position: sticky; top: 0; z-index: 30;
   }
-  .brand-mark {
-    display: flex; align-items: center; gap: 10px;
-    font-weight: 700; letter-spacing: -.01em; font-size: 15px; color: var(--ink);
+  .brand-mark { display: flex; align-items: center; gap: 11px; font-weight: 700; font-size: 16px; letter-spacing: -.01em; }
+  .brand-mark .dot { width: 30px; height: 30px; border-radius: 8px; background: var(--brand); display: grid; place-items: center; }
+  .brand-mark .dot::after { content:""; width: 11px; height: 11px; border-radius: 50%; background: var(--amber); }
+  .brand-mark .sub { font-size: 11.5px; font-weight: 600; color: var(--ink-soft); letter-spacing: .04em; text-transform: uppercase; }
+  .head-actions { display: flex; align-items: center; gap: 10px; }
+  .search-box {
+    display: flex; align-items: center; gap: 8px; background: var(--paper);
+    border: 1.5px solid var(--line); border-radius: 10px; padding: 9px 13px; min-width: 220px;
   }
-  .brand-mark .dot {
-    width: 26px; height: 26px; border-radius: 7px;
-    background: var(--brand); position: relative;
-    display: grid; place-items: center;
-  }
-  .brand-mark .dot::after {
-    content: ""; width: 10px; height: 10px; border-radius: 50%;
-    background: var(--amber);
-  }
-  .step-count {
-    font-size: 12.5px; font-weight: 600; color: var(--ink-soft);
-    letter-spacing: .02em;
-  }
-
-  /* Slide viewport */
-  #viewport {
-    height: 100vh; width: 100%;
-    position: relative;
-    overflow: hidden;
-  }
-  .slide {
-    position: absolute; inset: 0;
-    display: flex; align-items: center; justify-content: center;
-    padding: 96px clamp(20px, 6vw, 80px) 120px;
-    opacity: 0; visibility: hidden;
-    transform: translateY(40px);
-    transition: opacity .4s ease, transform .5s cubic-bezier(.16,.84,.44,1);
-    overflow-y: auto;
-  }
-  .slide.active { opacity: 1; visibility: visible; transform: translateY(0); }
-  .slide.exit-up { transform: translateY(-40px); }
-
-  .frame { width: 100%; max-width: 620px; }
-
-  .eyebrow {
-    display: inline-flex; align-items: center; gap: 8px;
-    font-size: 12px; font-weight: 700; letter-spacing: .08em;
-    text-transform: uppercase; color: var(--brand);
-    margin-bottom: 18px;
-  }
-  .eyebrow .num {
-    font-variant-numeric: tabular-nums;
-    background: var(--brand); color: #fff;
-    padding: 2px 8px; border-radius: 5px; font-size: 11px;
-  }
-  h1.q {
-    font-size: clamp(24px, 4.2vw, 38px);
-    line-height: 1.15; letter-spacing: -.02em; font-weight: 700;
-    margin-bottom: 10px;
-  }
-  .q .opt { color: var(--ink-soft); font-weight: 500; font-size: .62em; }
-  p.help {
-    font-size: 15px; color: var(--ink-soft); line-height: 1.5;
-    margin-bottom: 30px; max-width: 52ch;
-  }
-
-  /* Inputs */
-  .field { margin-bottom: 18px; }
-  .field label {
-    display: block; font-size: 13.5px; font-weight: 600;
-    color: var(--ink); margin-bottom: 7px;
-  }
-  input[type=text], input[type=date], textarea {
-    width: 100%; font-family: inherit; font-size: 18px; color: var(--ink);
-    background: var(--card); border: 1.5px solid var(--line);
-    border-radius: 12px; padding: 15px 16px; transition: border-color .18s, box-shadow .18s;
-  }
-  textarea { resize: vertical; min-height: 110px; font-size: 15px; line-height: 1.55; }
-  input:focus, textarea:focus {
-    outline: none; border-color: var(--focus);
-    box-shadow: 0 0 0 4px rgba(47,127,184,.14);
-  }
-  input::placeholder, textarea::placeholder { color: #9fb0be; }
-  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-  @media (max-width: 520px){ .two-col { grid-template-columns: 1fr; } }
-
-  /* Checkbox grid */
-  .checks { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 8px; }
-  @media (max-width: 520px){ .checks { grid-template-columns: 1fr; } }
-  .check {
-    display: flex; align-items: center; gap: 12px;
-    border: 1.5px solid var(--line); background: var(--card);
-    border-radius: 11px; padding: 13px 15px; cursor: pointer;
-    transition: border-color .15s, background .15s, transform .08s;
-    user-select: none;
-  }
-  .check:hover { border-color: #b9cad8; }
-  .check:active { transform: scale(.99); }
-  .check .box {
-    width: 22px; height: 22px; border-radius: 6px; flex: none;
-    border: 1.5px solid #b2c2cf; display: grid; place-items: center;
-    transition: background .15s, border-color .15s;
-  }
-  .check .box svg { width: 13px; height: 13px; opacity: 0; transform: scale(.6); transition: .15s; }
-  .check .key {
-    font-size: 11px; font-weight: 700; color: var(--ink-soft);
-    background: var(--paper); border: 1px solid var(--line);
-    border-radius: 5px; padding: 1px 6px; margin-left: auto;
-  }
-  .check .label-txt { font-size: 15.5px; font-weight: 600; }
-  .check .sub { font-size: 12px; color: var(--ink-soft); font-weight: 500; display: block; margin-top: 1px; }
-  .check.checked { border-color: var(--brand); background: #eef5fa; }
-  .check.checked .box { background: var(--brand); border-color: var(--brand); }
-  .check.checked .box svg { opacity: 1; stroke: #fff; transform: scale(1); }
-
-  #otherBox { margin-top: 6px; display: none; }
-  #otherBox.show { display: block; animation: drop .3s ease; }
-  @keyframes drop { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
-
-  /* Upload */
-  .drop {
-    border: 2px dashed var(--line); border-radius: 14px;
-    padding: 34px 20px; text-align: center; cursor: pointer;
-    background: var(--card); transition: border-color .18s, background .18s;
-  }
-  .drop:hover, .drop.drag { border-color: var(--brand); background: #eef5fa; }
-  .drop .ico { font-size: 30px; margin-bottom: 8px; }
-  .drop strong { color: var(--brand); }
-  .drop small { display: block; color: var(--ink-soft); margin-top: 6px; font-size: 12.5px; }
-  #fileList { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
-  .file-chip {
-    display: flex; align-items: center; gap: 10px;
-    background: var(--card); border: 1.5px solid var(--line);
-    border-radius: 10px; padding: 10px 13px; font-size: 14px;
-  }
-  .file-chip .fname { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .file-chip .fsize { color: var(--ink-soft); font-size: 12px; margin-left: auto; flex: none; }
-  .file-chip button {
-    background: none; border: none; cursor: pointer; color: var(--err);
-    font-size: 18px; line-height: 1; padding: 2px; flex: none;
-  }
-  .divider-or { text-align: center; color: var(--ink-soft); font-size: 12px; font-weight: 600; letter-spacing: .05em; margin: 14px 0; }
-
-  /* Footer nav */
-  .navrow {
-    display: flex; align-items: center; gap: 14px; margin-top: 28px;
-  }
+  .search-box input { border: none; background: none; outline: none; font-family: inherit; font-size: 14px; width: 100%; color: var(--ink); }
   .btn {
-    font-family: inherit; font-size: 16px; font-weight: 700; cursor: pointer;
-    border: none; border-radius: 11px; padding: 14px 26px;
-    display: inline-flex; align-items: center; gap: 9px;
-    transition: transform .08s, background .18s, box-shadow .18s;
+    font-family: inherit; font-size: 13.5px; font-weight: 700; cursor: pointer;
+    border: none; border-radius: 10px; padding: 10px 16px; display: inline-flex;
+    align-items: center; gap: 7px; transition: background .15s, transform .08s;
   }
   .btn:active { transform: translateY(1px); }
-  .btn-primary { background: var(--brand); color: #fff; box-shadow: 0 6px 18px rgba(18,80,122,.24); }
+  .btn-primary { background: var(--brand); color: #fff; }
   .btn-primary:hover { background: var(--brand-deep); }
-  .btn-ghost { background: transparent; color: var(--ink-soft); padding: 14px 8px; }
-  .btn-ghost:hover { color: var(--ink); }
-  .enter-hint { font-size: 12.5px; color: var(--ink-soft); display: inline-flex; align-items: center; gap: 6px; }
-  .enter-hint kbd {
-    background: var(--card); border: 1px solid var(--line); border-bottom-width: 2px;
-    border-radius: 5px; padding: 2px 6px; font-family: inherit; font-size: 11px; font-weight: 700;
-  }
-  .err-msg { color: var(--err); font-size: 13px; font-weight: 600; margin-top: 8px; display: none; }
-  .err-msg.show { display: block; }
+  .btn-ghost { background: var(--paper); color: var(--ink-soft); border: 1.5px solid var(--line); }
+  .btn-ghost:hover { border-color: var(--brand); color: var(--brand); }
 
-  /* fixed bottom bar for up/down nav */
-  #dpad {
-    position: fixed; right: clamp(16px, 4vw, 40px); bottom: 22px; z-index: 40;
-    display: flex; flex-direction: column; gap: 6px;
-  }
-  #dpad button {
-    width: 40px; height: 34px; border-radius: 8px; cursor: pointer;
-    background: var(--card); border: 1.5px solid var(--line); color: var(--ink-soft);
-    display: grid; place-items: center; transition: .15s;
-  }
-  #dpad button:hover:not(:disabled) { border-color: var(--brand); color: var(--brand); }
-  #dpad button:disabled { opacity: .35; cursor: not-allowed; }
+  .wrap { padding: clamp(16px,4vw,32px); max-width: 1280px; margin: 0 auto; }
 
-  /* Review + success */
-  .review-card {
-    background: var(--card); border: 1.5px solid var(--line); border-radius: 14px;
-    padding: 6px 20px; margin-bottom: 24px;
+  /* KPI strip */
+  .kpis { display: grid; grid-template-columns: repeat(6,1fr); gap: 12px; margin-bottom: 22px; }
+  @media (max-width: 900px){ .kpis { grid-template-columns: repeat(3,1fr); } }
+  @media (max-width: 520px){ .kpis { grid-template-columns: repeat(2,1fr); } }
+  .kpi {
+    background: var(--card); border: 1.5px solid var(--line); border-radius: 13px;
+    padding: 15px 16px; cursor: pointer; transition: border-color .15s, transform .08s, box-shadow .15s;
+    border-left-width: 4px;
   }
-  .review-row {
-    display: flex; justify-content: space-between; gap: 16px;
-    padding: 13px 0; border-bottom: 1px solid var(--line);
+  .kpi:hover { box-shadow: 0 6px 18px rgba(14,36,56,.08); transform: translateY(-1px); }
+  .kpi.active { border-color: var(--brand); box-shadow: 0 0 0 2px rgba(18,80,122,.14); }
+  .kpi .n { font-size: 26px; font-weight: 800; letter-spacing: -.02em; line-height: 1; font-variant-numeric: tabular-nums; }
+  .kpi .l { font-size: 12px; font-weight: 600; color: var(--ink-soft); margin-top: 6px; letter-spacing: .01em; }
+  .kpi.k-all { border-left-color: var(--ink-soft); }
+  .kpi.k-received { border-left-color: var(--s-received); }
+  .kpi.k-assigned { border-left-color: var(--s-assigned); }
+  .kpi.k-completed { border-left-color: var(--s-completed); }
+  .kpi.k-lab { border-left-color: var(--s-lab); }
+  .kpi.k-exception { border-left-color: var(--err); }
+
+  /* Table */
+  .table-card { background: var(--card); border: 1.5px solid var(--line); border-radius: 15px; overflow: hidden; }
+  .table-top {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 15px 18px; border-bottom: 1px solid var(--line); flex-wrap: wrap;
   }
-  .review-row:last-child { border-bottom: none; }
-  .review-row .k { font-size: 13px; color: var(--ink-soft); font-weight: 600; flex: none; }
-  .review-row .v { font-size: 14.5px; font-weight: 600; text-align: right; }
-  .review-row .v.empty { color: #9fb0be; font-weight: 500; font-style: italic; }
+  .table-top h2 { font-size: 15px; font-weight: 700; letter-spacing: -.01em; }
+  .table-top .filters { display: flex; gap: 8px; flex-wrap: wrap; }
+  .chip {
+    font-size: 12.5px; font-weight: 600; padding: 6px 12px; border-radius: 20px;
+    border: 1.5px solid var(--line); background: var(--paper); color: var(--ink-soft);
+    cursor: pointer; transition: .15s;
+  }
+  .chip:hover { border-color: var(--brand); }
+  .chip.on { background: var(--brand); color: #fff; border-color: var(--brand); }
+
+  .tscroll { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; min-width: 880px; }
+  thead th {
+    text-align: left; font-size: 11.5px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .05em; color: var(--ink-soft); padding: 12px 16px;
+    border-bottom: 1px solid var(--line); white-space: nowrap; background: #fbfcfd;
+    position: sticky; top: 0;
+  }
+  tbody td { padding: 13px 16px; border-bottom: 1px solid #eef2f6; vertical-align: middle; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: #fafcfe; }
+  .pt-name { font-weight: 700; letter-spacing: -.01em; }
+  .pt-meta { font-size: 12px; color: var(--ink-soft); margin-top: 2px; }
+  .mono { font-variant-numeric: tabular-nums; }
+  .tests-cell { display: flex; flex-wrap: wrap; gap: 4px; max-width: 200px; }
   .tag {
     display: inline-block; background: #eef5fa; color: var(--brand);
-    border: 1px solid #cfe0ec; border-radius: 6px; padding: 2px 9px;
-    font-size: 12.5px; font-weight: 700; margin: 2px 0 2px 6px;
+    border: 1px solid #cfe0ec; border-radius: 5px; padding: 1px 7px; font-size: 11.5px; font-weight: 700;
   }
+  .tag.recur { background: #fff5e8; color: var(--amber); border-color: #f0dcbb; }
+  .badge-notify { font-size: 11px; color: var(--ok); font-weight: 700; }
+  .badge-notify.off { color: var(--ink-soft); font-weight: 500; }
 
-  #successCheck {
-    width: 84px; height: 84px; border-radius: 50%; background: var(--ok);
-    display: grid; place-items: center; margin-bottom: 26px;
-    animation: pop .5s cubic-bezier(.16,.84,.44,1);
+  /* Status select — solid colored pill, color set per-status below */
+  .status-wrap { position: relative; }
+  select.status {
+    font-family: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer;
+    border: none; border-radius: 9px; padding: 8px 30px 8px 12px;
+    appearance: none; -webkit-appearance: none;
+    color: #fff; transition: .15s; min-width: 172px;
+    background-color: var(--s-received); /* default, overridden per status */
+    box-shadow: 0 1px 2px rgba(10,22,40,.12);
   }
-  @keyframes pop { 0%{transform:scale(0)} 70%{transform:scale(1.1)} 100%{transform:scale(1)} }
-  #successCheck svg { width: 42px; height: 42px; stroke: #fff; }
+  select.status:hover { filter: brightness(1.06); }
+  select.status:focus { outline: none; box-shadow: 0 0 0 3px rgba(47,127,184,.25); }
+  .status-wrap::after {
+    content: "▾"; position: absolute; right: 11px; top: 50%; transform: translateY(-50%);
+    color: rgba(255,255,255,.9); pointer-events: none; font-size: 11px;
+  }
+  select.status option { background: #fff; color: var(--ink); font-weight: 600; }
+  /* !important guarantees the status color wins over the base background */
+  select.st-received  { background-color: var(--s-received)  !important; }
+  select.st-assigned  { background-color: var(--s-assigned)  !important; }
+  select.st-completed { background-color: var(--s-completed) !important; }
+  select.st-lab       { background-color: var(--s-lab)       !important; }
+  select.st-noshow    { background-color: var(--s-noshow)    !important; }
+  select.st-unreach   { background-color: var(--s-unreach)   !important; }
 
-  .confid {
-    background: #fff8ee; border: 1px solid #f0dcbb; border-radius: 10px;
-    padding: 12px 15px; font-size: 12.5px; color: #8a6414; line-height: 1.5;
-    display: flex; gap: 9px; margin-top: 22px;
-  }
+  /* Row-level tint — faint wash of the status color across the whole row */
+  tr.row-completed { background: linear-gradient(90deg, rgba(30,122,83,.05), transparent 60%); }
+  tr.row-assigned  { background: linear-gradient(90deg, rgba(192,125,30,.06), transparent 60%); }
+  tr.row-lab       { background: linear-gradient(90deg, rgba(18,80,122,.05), transparent 60%); }
+  tr.row-noshow    { background: linear-gradient(90deg, rgba(178,58,58,.08), transparent 55%); }
+  tr.row-unreach   { background: linear-gradient(90deg, rgba(138,79,176,.07), transparent 55%); }
+  tr.row-noshow td:first-child  { box-shadow: inset 3px 0 0 var(--s-noshow); }
+  tr.row-unreach td:first-child { box-shadow: inset 3px 0 0 var(--s-unreach); }
 
-  /* Mode select cards */
-  .mode-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 8px; }
-  @media (max-width: 560px){ .mode-grid { grid-template-columns: 1fr; } }
-  .mode-card {
-    border: 1.5px solid var(--line); background: var(--card); border-radius: 14px;
-    padding: 22px 20px; cursor: pointer; text-align: left;
-    transition: border-color .15s, transform .08s, box-shadow .15s;
-  }
-  .mode-card:hover { border-color: var(--brand); box-shadow: 0 8px 22px rgba(18,80,122,.12); }
-  .mode-card:active { transform: scale(.99); }
-  .mode-card.sel { border-color: var(--brand); background: #eef5fa; box-shadow: 0 0 0 3px rgba(18,80,122,.12); }
-  .mode-card .mi { font-size: 30px; margin-bottom: 12px; display: block; }
-  .mode-card h3 { font-size: 18px; font-weight: 700; margin-bottom: 5px; letter-spacing: -.01em; }
-  .mode-card p { font-size: 13.5px; color: var(--ink-soft); line-height: 1.45; }
+  .rq-badge{display:inline-block;color:#fff;font-size:10.5px;font-weight:800;border-radius:5px;
+    padding:1px 6px;margin-right:7px;vertical-align:1px;letter-spacing:.02em}
+  .lang-chip{display:inline-block;background:#f3ecfa;color:#6b3a95;border:1px solid #e0d0ef;
+    border-radius:5px;padding:1px 7px;font-size:10.5px;font-weight:800;margin-left:6px;text-transform:uppercase;letter-spacing:.03em}
+  .pt-meta.acc{color:#8a6414;margin-top:3px;font-size:11.5px}
+  .due{font-weight:800;font-size:13.5px;font-variant-numeric:tabular-nums}
+  .due.d-over{color:var(--err)} .due.d-today{color:var(--amber)}
+  .due.d-week{color:var(--brand)} .due.d-up{color:var(--ink-soft)} .due.d-none{color:#b6c3cd}
+  .ok-chip{display:inline-block;background:#e8f5ee;color:var(--ok);border:1px solid #cbe6d6;
+    border-radius:5px;padding:2px 8px;font-size:11px;font-weight:800}
+  .warn-chip{display:inline-block;background:#fdf3f3;color:var(--err);border:1px solid #e8c9c9;
+    border-radius:5px;padding:2px 8px;font-size:11px;font-weight:800;cursor:help}
+  .org-chip{display:inline-block;font-size:10px;font-weight:800;padding:1px 7px;border-radius:5px;margin-left:7px;letter-spacing:.03em;text-transform:uppercase;vertical-align:1px}
+  .empty-state { padding: 60px 20px; text-align: center; color: var(--ink-soft); }
+  th.sortable { cursor: pointer; user-select: none; }
+  th.sortable:hover { color: var(--brand); }
+  .sort-arrow { font-size: 11px; opacity: .7; margin-left: 2px; }
+  tr.row-click { cursor: pointer; }
+  tr.row-click:hover { background: rgba(47,127,184,.06) !important; }
 
-  /* Patient counter chip in header area of a slide */
-  .pt-chip {
-    display: inline-flex; align-items: center; gap: 7px;
-    background: #eef5fa; border: 1px solid #cfe0ec; color: var(--brand);
-    border-radius: 20px; padding: 4px 12px; font-size: 12px; font-weight: 700;
-    margin-bottom: 16px;
+  /* Order detail overlay */
+  .detail-overlay {
+    position: fixed; inset: 0; background: rgba(10,22,40,.45);
+    display: none; align-items: flex-start; justify-content: center;
+    z-index: 100; padding: 40px 16px; overflow-y: auto;
   }
-  .pt-chip .pulse { width: 7px; height: 7px; border-radius: 50%; background: var(--amber); }
+  .detail-overlay.show { display: flex; }
+  .detail-panel {
+    background: var(--card); border-radius: 16px; max-width: 640px; width: 100%;
+    box-shadow: 0 20px 60px rgba(10,22,40,.3); overflow: hidden;
+  }
+  .detail-panel-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 20px; border-bottom: 1px solid var(--line);
+  }
+  .detail-panel-head h3 { font-size: 14px; font-weight: 700; color: var(--ink); }
+  .detail-close {
+    border: none; background: var(--surface-2); width: 30px; height: 30px;
+    border-radius: 8px; cursor: pointer; font-size: 16px; color: var(--ink-soft);
+  }
+  .detail-close:hover { background: var(--line); }
+  #detailBody { padding: 20px; }
+  .dt-head { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 18px; gap: 12px; }
+  .dt-name { font-size: 17px; font-weight: 700; color: var(--ink); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .dt-sub { font-size: 12px; color: var(--ink-soft); margin-top: 4px; }
+  .dt-status { color: #fff; font-size: 12px; font-weight: 700; padding: 5px 12px; border-radius: 8px; white-space: nowrap; }
+  .dt-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 20px; }
+  .dt-field.wide { grid-column: 1 / -1; }
+  .dt-label { font-size: 10.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--ink-soft); margin-bottom: 4px; }
+  .dt-val { font-size: 13.5px; color: var(--ink); line-height: 1.45; }
+  @media(max-width:560px){ .dt-grid { grid-template-columns: 1fr; } }
+  .req-btn { background: var(--brand); color:#fff; border:none; border-radius:8px;
+    padding:8px 14px; font-size:13px; font-weight:700; cursor:pointer; font-family:inherit; }
+  .req-btn:hover { filter: brightness(1.08); }
+  .empty-state .ico { font-size: 40px; margin-bottom: 12px; }
 
-  /* Roster (multi-patient add/finish + review) */
-  .roster { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
-  .roster-item {
-    display: flex; align-items: center; gap: 13px;
-    background: var(--card); border: 1.5px solid var(--line); border-radius: 12px;
-    padding: 14px 16px;
+  .flash {
+    position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%) translateY(80px);
+    background: var(--ink); color: #fff; padding: 12px 20px; border-radius: 11px;
+    font-size: 13.5px; font-weight: 600; box-shadow: 0 10px 30px rgba(0,0,0,.25);
+    transition: transform .3s cubic-bezier(.16,.84,.44,1); z-index: 60; display: flex; align-items: center; gap: 9px;
   }
-  .roster-item .idx {
-    width: 30px; height: 30px; border-radius: 8px; flex: none;
-    background: var(--brand); color: #fff; display: grid; place-items: center;
-    font-size: 13px; font-weight: 700;
-  }
-  .roster-item .meta { min-width: 0; flex: 1; }
-  .roster-item .rn { font-size: 15px; font-weight: 700; letter-spacing: -.01em; }
-  .roster-item .rd { font-size: 12.5px; color: var(--ink-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .roster-item .ract { display: flex; gap: 4px; flex: none; }
-  .roster-item .ract button {
-    background: none; border: 1px solid var(--line); border-radius: 7px; cursor: pointer;
-    padding: 5px 8px; font-size: 12px; font-weight: 600; color: var(--ink-soft); transition: .15s;
-  }
-  .roster-item .ract button:hover { border-color: var(--brand); color: var(--brand); }
-  .roster-item .ract button.del:hover { border-color: var(--err); color: var(--err); }
-  .roster-empty { color: var(--ink-soft); font-size: 14px; font-style: italic; padding: 8px 0 4px; }
-  .add-row { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 6px; }
-  .btn-add { background: #eef5fa; color: var(--brand); border: 1.5px solid #cfe0ec; }
-  .btn-add:hover { background: #e2eef7; }
+  .flash.show { transform: translateX(-50%) translateY(0); }
+  .flash .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); }
 
-  /* Notification block */
-  .notify-block {
-    background: var(--paper); border: 1.5px solid var(--line);
-    border-radius: 14px; padding: 18px 18px 16px; margin-top: 6px; margin-bottom: 4px;
-  }
-  .notify-head { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 700; letter-spacing: -.01em; margin-bottom: 4px; }
-  .notify-head .ni { font-size: 17px; }
-  .notify-sub { font-size: 13px; color: var(--ink-soft); line-height: 1.5; margin-bottom: 14px; }
-  .sel-input {
-    width:100%; font-family:inherit; font-size:18px; color:var(--ink);
-    background:var(--card); border:1.5px solid var(--line); border-radius:12px;
-    padding:15px 16px; appearance:none; -webkit-appearance:none; cursor:pointer;
-    background-image:url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2345607a' stroke-width='2.5'%3e%3cpath d='M6 9l6 6 6-6'/%3e%3c/svg%3e");
-    background-repeat:no-repeat; background-position:right 14px center; background-size:18px;
-  }
-  .sel-input:focus { outline:none; border-color:var(--focus); box-shadow:0 0 0 4px rgba(47,127,184,.14); }
-  .hint-note { font-size:12px; color:var(--ink-soft); margin-top:6px; line-height:1.45; }
-  .match-banner {
-    background:#eef7f1; border:1.5px solid #cbe6d6; border-radius:12px;
-    padding:14px 16px; margin-bottom:16px; font-size:13.5px; line-height:1.55; color:#14603f;
-  }
-  .match-banner strong { color:#0e4a30; }
-  .match-banner .rq {
-    display:inline-block; background:var(--ok); color:#fff; font-weight:800;
-    border-radius:6px; padding:1px 9px; font-size:12px; margin-left:4px;
-  }
-  .notify-confirm {
-    background: #eef7f1; border: 1px solid #cbe6d6; color: var(--ok);
-    border-radius: 10px; padding: 12px 16px; font-size: 13.5px; line-height: 1.5;
-    margin-top: 4px; max-width: 46ch;
-  }
+  .foot { text-align: center; color: var(--ink-soft); font-size: 12px; margin-top: 20px; line-height: 1.6; }
 </style>
 </head>
 <body>
-<div id="progressWrap"><div id="progressBar"></div></div>
-
 <header>
   <div class="brand-mark">
     <span class="dot"></span>
-    Beyond Mobile Health
+    <div>
+      Beyond Mobile Health
+      <div class="sub">Dispatch Dashboard</div>
+    </div>
   </div>
-  <div class="step-count" id="stepCount">1 → 8</div>
+  <div class="head-actions">
+    <div class="search-box">
+      <span>🔍</span>
+      <input type="text" id="search" placeholder="Search patient, MRN, physician...">
+    </div>
+    <button class="btn btn-ghost" id="seedBtn">↻ Refresh</button>
+  </div>
 </header>
 
-<div id="viewport"></div>
+<div class="wrap">
+  <div class="kpis" id="kpis"></div>
 
-<div id="dpad">
-  <button id="upBtn" aria-label="Previous">▲</button>
-  <button id="downBtn" aria-label="Next">▼</button>
+  <div class="table-card">
+    <div class="table-top">
+      <h2 id="tableTitle">All submissions</h2>
+      <div class="filters" id="typeFilters">
+        <span class="chip on" data-type="all">All</span>
+        <span class="chip" data-type="overdue">Overdue</span>
+        <span class="chip" data-type="today">Today</span>
+        <span class="chip" data-type="week">This week</span>
+        <span class="chip" data-type="upcoming">Upcoming</span>
+        <span class="chip" data-type="recurring">Weekly</span>
+        <span class="chip" data-type="needsinfo">Needs info</span>
+        <span class="chip" data-type="exceptions">Exceptions</span>
+      </div>
+    </div>
+    <div class="tscroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Patient</th>
+            <th>MRN</th>
+            <th>Tests</th>
+            <th id="dateSortHead" class="sortable">Draw date <span id="dateSortArrow" class="sort-arrow">↓</span></th>
+            <th>Physician</th>
+            <th>Billing</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+    <div class="empty-state" id="emptyState" style="display:none;">
+      <div class="ico">📥</div>
+      <div>No submissions match this view.</div>
+    </div>
+  </div>
+
+  <div class="foot">
+    Status changes save to this dashboard. Setting <strong>Assigned</strong> or <strong>Completed</strong> is what triggers the client's email notification in your GHL workflow.<br>
+    Live data from the Supabase <code>patients</code> table (Patient Table project). Intake submissions appear here automatically.
+  </div>
 </div>
 
+<div class="flash" id="flash"><span class="dot"></span><span id="flashMsg"></span></div>
+
+<div class="detail-overlay" id="detailOverlay">
+  <div class="detail-panel">
+    <div class="detail-panel-head">
+      <h3>Order detail</h3>
+      <button class="detail-close" id="detailClose">✕</button>
+    </div>
+    <div id="detailBody"></div>
+  </div>
+</div>
 <script>
-// ============================================================
-//  BMH Mobile Lab Intake — supports individual OR batch orders
-// ============================================================
+// ---------- Status model ----------
+const STATUSES = [
+  {id:"received",  label:"Received order",        cls:"st-received",  color:"#5b7488"},
+  {id:"assigned",  label:"Assigned order",        cls:"st-assigned",  color:"#c07d1e"},
+  {id:"completed", label:"Completed order",       cls:"st-completed", color:"#1e7a53"},
+  {id:"lab",       label:"Dropped off at lab",    cls:"st-lab",       color:"#12507a"},
+  {id:"noshow",    label:"No show",               cls:"st-noshow",    color:"#b23a3a"},
+  {id:"unreach",   label:"Unable to reach patient",cls:"st-unreach",  color:"#8a4fb0"},
+];
+const EXCEPTION = ["noshow","unreach"];
+function statusOf(id){ return STATUSES.find(s=>s.id===id) || STATUSES[0]; }
 
-// ---------- Supabase (browser client via REST) ----------
-const SB_URL = "https://hnamuztnddupqasikrfi.supabase.co";
-const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhuYW11enRuZGR1cHFhc2lrcmZpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxODY5MjcsImV4cCI6MjA5MDc2MjkyN30.Y2fWzyzMv1HJcjaBx6dvzhdhkOkZSo6eakif4T2I-1M";
 
-function newOrderId(){
-  const d = new Date();
-  const stamp = d.getFullYear().toString().slice(2)
-    + String(d.getMonth()+1).padStart(2,"0")
-    + String(d.getDate()).padStart(2,"0");
-  const rand = Math.random().toString(36).slice(2,7).toUpperCase();
-  return `BMH-${stamp}-${rand}`;
-}
+// ---------- Supabase (live) ----------
+// Credentials live server-side. This page talks only to the Railway API.
+const API_HEAD = { "Content-Type": "application/json" };
 
-const sbHeaders = {
-  "apikey": SB_KEY,
-  "Authorization": `Bearer ${SB_KEY}`,
-  "Content-Type": "application/json"
-};
-const digitsOnly = s => String(s||"").replace(/\D/g,"");
-const nameKey    = s => String(s||"").trim().toLowerCase().replace(/\s+/g," ");
+let rows = [];
+let filter = { type:"all", status:"all", q:"" };
+let dateSortDir = "desc"; // newest draw date first by default
 
-// --- Patient matching -------------------------------------------------
-// Audit basis: MRN blank on 63% of records, DOB blank on 56%, but phone
-// present on 385/399 and identical across every duplicate group.
-// Order of trust: MRN > name+DOB > name+phone.
-async function findExistingPerson(p){
-  const phone = digitsOnly(p.telephone);
-  const nk    = nameKey(`${p.firstName} ${p.lastName}`);
-
-  // 1. MRN is the strongest signal when present
-  if(p.mrn && p.mrn.trim()){
-    const r = await fetch(`${SB_URL}/rest/v1/people?select=*&mrn=eq.${encodeURIComponent(p.mrn.trim())}&limit=1`,
-      { headers: sbHeaders });
-    if(r.ok){ const j = await r.json(); if(j.length) return { person:j[0], basis:"MRN" }; }
-  }
-
-  // 2 & 3. Pull candidates on phone, then confirm by name (and DOB if we have it).
-  if(phone){
-    const r = await fetch(`${SB_URL}/rest/v1/people?select=*&phone_digits=eq.${encodeURIComponent(phone)}&limit=25`,
-      { headers: sbHeaders });
-    if(r.ok){
-      const cands = await r.json();
-      // 18 phone numbers are shared by multiple names (households/facilities),
-      // so phone alone is never sufficient — the name must agree too.
-      const byName = cands.filter(c => nameKey(c.full_name) === nk);
-      if(byName.length){
-        if(p.dob){
-          const exact = byName.find(c => String(c.dob||"").slice(0,10) === p.dob);
-          if(exact) return { person:exact, basis:"name + DOB" };
-        }
-        return { person:byName[0], basis:"name + phone" };
-      }
-    }
-  }
-  return null;
-}
-
-async function countExistingOrders(personId){
-  const r = await fetch(`${SB_URL}/rest/v1/orders?select=id,recurrence_group_id&person_id=eq.${personId}`,
-    { headers: sbHeaders });
-  if(!r.ok) return 0;
-  const j = await r.json();
-  if(!Array.isArray(j)) return 0;
-  // A recurring series counts as ONE request, not one per occurrence.
-  const groups = new Set(j.map(o => o.recurrence_group_id || o.id));
-  return groups.size;
-}
-
-async function createPerson(p){
-  const body = {
-    mrn: p.mrn || null,
-    first_name: p.firstName,
-    last_name: p.lastName,
-    full_name: `${p.firstName} ${p.lastName}`.trim(),
-    dob: p.dob || null,
-    phone: p.telephone || null,
-    phone_digits: digitsOnly(p.telephone) || null,
-    email: form.notifyEmail || null,
-    home_address: p.address || null,
-    language: p.language || "English",
-    language_other: p.language === "Other" ? (p.languageOther || null) : null,
-    interpreter_needed: !!(p.language && p.language !== "English"),
-    alt_contact_name: p.altName || null,
-    alt_contact_phone: p.altPhone || null,
-    alt_contact_title: p.altTitle || null
+// Map an `orders` row (joined to people) -> dashboard row shape
+function fromDb(r){
+  const pe = r.people || {};
+  const pay = r.payload || {};
+  const testList = Array.isArray(r.tests) && r.tests.length
+    ? r.tests
+    : (r.test_type ? String(r.test_type).split(",").map(s=>s.trim()).filter(Boolean) : []);
+  const full = (pe.full_name || "").trim();
+  return {
+    id: r.id,
+    personId: r.person_id,
+    requestNo: r.request_no || 1,
+    first: pe.first_name || full.split(" ")[0] || "",
+    last:  pe.last_name  || full.split(" ").slice(1).join(" ") || "",
+    mrn: pe.mrn || "—",
+    dob: pe.dob ? String(pe.dob).slice(0,10) : "",
+    phone: pe.phone || "",
+    language: pe.language || "English",
+    languageOther: pe.language_other || "",
+    interpreter: !!pe.interpreter_needed,
+    altName: pe.alt_contact_name || "",
+    altTitle: pe.alt_contact_title || "",
+    tests: testList,
+    recurring: !!r.is_recurring,
+    occIndex: r.occurrence_index,
+    occTotal: r.occurrence_total,
+    requestedDate: r.requested_date ? String(r.requested_date).slice(0,10) : "",
+    physician: r.provider || "—",
+    npi: r.provider_npi || "—",
+    address: r.service_address || pe.home_address || "",
+    accessNotes: r.access_notes || "",
+    bestTime: r.best_time || "",
+    billingReady: !!r.billing_ready,
+    missing: Array.isArray(r.missing_fields) ? r.missing_fields : [],
+    assignee: r.assignee || "",
+    submittedBy: pay.submitted_by || r.source || "—",
+    submittedDate: (r.received_at||"").slice(0,10),
+    notify: r.notify_email || "",
+    status: r.status || "received",
+    source: r.source || "manual",
+    orgId: r.org_id || null,
+    orgName: r.org_name || null,
+    orgColor: r.org_color || "#8896ab",
+    orgBg: r.org_bg || "#f1f5f9",
+    requisitionPath: r.requisition_path || null
   };
-  const r = await fetch(`${SB_URL}/rest/v1/people`, {
-    method:"POST",
-    headers: { ...sbHeaders, "Prefer":"return=representation" },
-    body: JSON.stringify(body)
-  });
-  if(!r.ok) throw new Error(`person insert (${r.status}) ${(await r.text()).slice(0,140)}`);
-  return (await r.json())[0];
 }
 
-// Enrich an existing person with any field they were missing.
-async function enrichPerson(person, p){
-  const patch = {};
-  if(!person.mrn && p.mrn)                 patch.mrn = p.mrn;
-  if(!person.dob && p.dob)                 patch.dob = p.dob;
-  if(!person.home_address && p.address)    patch.home_address = p.address;
-  if(!person.phone && p.telephone)         { patch.phone = p.telephone; patch.phone_digits = digitsOnly(p.telephone); }
-  if(p.language && p.language !== person.language) patch.language = p.language;
-  if(!person.alt_contact_name && p.altName){
-    patch.alt_contact_name = p.altName;
-    patch.alt_contact_phone = p.altPhone || null;
-    patch.alt_contact_title = p.altTitle || null;
+async function load(){
+  setLoading(true);
+  try {
+    const r = await fetch("/api/dispatch?limit=1000", { headers: API_HEAD, credentials: "same-origin" });
+    if(!r.ok) throw new Error(`(${r.status}) ${await r.text()}`);
+    const data = await r.json();
+    rows = data.map(fromDb);
+    setLoading(false);
+    render();
+  } catch(e){
+    setLoading(false);
+    showError(e.message);
   }
-  if(!Object.keys(patch).length) return person;
-  patch.updated_at = new Date().toISOString();
-  const r = await fetch(`${SB_URL}/rest/v1/people?id=eq.${person.id}`, {
-    method:"PATCH",
-    headers: { ...sbHeaders, "Prefer":"return=representation" },
+}
+
+async function updateStatus(id, status){
+  const patch = { status, updated_at: new Date().toISOString() };
+  if(status === "completed") patch.completed_date = new Date().toISOString().slice(0,10);
+  const r = await fetch(`/api/dispatch/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: API_HEAD,
+    credentials: "same-origin",
     body: JSON.stringify(patch)
   });
-  if(!r.ok) return person;
-  return (await r.json())[0] || person;
+  if(!r.ok) throw new Error(`(${r.status}) ${await r.text()}`);
+  return r.json();
 }
 
-// Compute which billing-critical fields are absent.
-function missingFieldsFor(p){
-  const m = [];
-  if(!p.address)        m.push("service_address");
-  if(!p.accessNotes)    m.push("access_notes");
-  if(!p.dob)            m.push("dob");
-  if(!p.mrn)            m.push("mrn");
-  if(!p.telephone)      m.push("phone");
-  if(!testNames(p).length) m.push("test_type");
-  if(!p.physicianName)  m.push("provider");
-  if(!p.npi)            m.push("provider_npi");
-  return m;
+function setLoading(on){
+  const tb = document.getElementById("tbody");
+  const es = document.getElementById("emptyState");
+  if(on){ es.style.display="none"; tb.innerHTML = `<tr><td colspan="7" style="padding:40px;text-align:center;color:var(--ink-soft);">Loading live submissions…</td></tr>`; }
+}
+function showError(msg){
+  document.getElementById("tbody").innerHTML =
+    `<tr><td colspan="7" style="padding:36px;text-align:center;color:var(--err);">
+      Could not load submissions.<div style="font-size:12px;color:var(--ink-soft);margin-top:8px;">${msg}</div>
+    </td></tr>`;
 }
 
-// Build the order row(s). A weekly order generates ONE ROW PER OCCURRENCE
-// so every draw is individually dated, trackable and billable.
-function buildOrders(p, personId, startingRequestNo){
-  const missing = missingFieldsFor(p);
-  const base = {
-    person_id: personId,
-    source: "web_intake",
-    status: "received",
-    test_type: testNames(p).join(", "),
-    tests: testNames(p),
-    provider: p.physicianName || null,
-    provider_npi: p.npi || null,
-    service_address: p.address || null,
-    access_notes: p.accessNotes || null,
-    best_time: p.bestTime || null,
-    billing_ready: missing.length === 0,
-    missing_fields: missing,
-    notify_email: form.notifyEmail || null,
-    notify_consent: !!form.notifyConsent,
-    notes: p.orderPaste || null,
-    payload: {
-      attachments: p.files.map(f=>f.name),
-      order_pasted: !!p.orderPaste,
-      submitted_by: form.submittedBy,
-      submitted_date: form.inputDate,
-      other_test: p.otherTest || null,
-      order_mode: form.mode,
-      language: p.language,
-      language_other: p.languageOther || null
+// ---------- Render ----------
+const OPEN = ["received","assigned"];
+function counts(){
+  const c = { all: rows.length, received:0, assigned:0, completed:0, lab:0, exception:0,
+              overdue:0, today:0, needsinfo:0 };
+  rows.forEach(r=>{
+    if(r.status==="received") c.received++;
+    else if(r.status==="assigned") c.assigned++;
+    else if(r.status==="completed") c.completed++;
+    else if(r.status==="lab") c.lab++;
+    if(EXCEPTION.includes(r.status)) c.exception++;
+    if(!r.billingReady) c.needsinfo++;
+    // date buckets only matter for orders still open
+    if(OPEN.includes(r.status)){
+      const b = dueBucket(r.requestedDate).key;
+      if(b==="overdue") c.overdue++;
+      if(b==="today")   c.today++;
     }
-  };
-
-  if(p.recurring === true && p.recurDays.length && p.recurStart && p.recurEnd){
-    const dayIdx = { Sun:0, Mon:1, Tue:2, Wed:3, Thu:4, Fri:5, Sat:6 };
-    const want = p.recurDays.map(d=>dayIdx[d]).filter(n=>n!==undefined);
-    const groupId = crypto.randomUUID();
-    const out = [];
-    const start = new Date(p.recurStart + "T00:00:00");
-    const end   = new Date(p.recurEnd   + "T00:00:00");
-    for(let d = new Date(start); d <= end; d.setDate(d.getDate()+1)){
-      if(want.includes(d.getDay())){
-        out.push({ ...base,
-          id: newOrderId(),
-          requested_date: d.toISOString().slice(0,10),
-          is_recurring: true,
-          recurrence_group_id: groupId
-        });
-      }
-      if(out.length > 200) break; // safety cap
-    }
-    return out.map((o,i)=>({ ...o,
-      request_no: startingRequestNo,
-      occurrence_index: i+1,
-      occurrence_total: out.length
-    }));
-  }
-
-  return [{ ...base,
-    id: newOrderId(),
-    requested_date: form.submissionDate || null,
-    request_no: startingRequestNo,
-    is_recurring: false
-  }];
+  });
+  return c;
 }
 
-async function submitToSupabase(){
-  try {
-    const results = [];
-    for(const p of form.patients){
-      const match = await findExistingPerson(p);
-      let person, isReturning = false, basis = null;
-
-      if(match){
-        person = await enrichPerson(match.person, p);
-        isReturning = true;
-        basis = match.basis;
-      } else {
-        person = await createPerson(p);
-      }
-
-      const priorCount = isReturning ? await countExistingOrders(person.id) : 0;
-      const rows = buildOrders(p, person.id, priorCount + 1);
-
-      const r = await fetch(`${SB_URL}/rest/v1/orders`, {
-        method:"POST",
-        headers: { ...sbHeaders, "Prefer":"return=representation" },
-        body: JSON.stringify(rows)
-      });
-      if(!r.ok) throw new Error(`order insert (${r.status}) ${(await r.text()).slice(0,140)}`);
-      const saved = await r.json();
-
-      // Upload the requisition file (if any) and stamp its path on the order(s).
-      // The bytes go to a PRIVATE Supabase Storage bucket; only the path is stored.
-      const reqFile = (p.files && p.files[0] && p.files[0].blob) ? p.files[0] : null;
-      if(reqFile && saved.length){
-        try {
-          const primaryId = saved[0].id;
-          const safeName = reqFile.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-          const objectPath = `${primaryId}/${safeName}`;
-          const up = await fetch(
-            `${SB_URL}/storage/v1/object/requisitions/${encodeURIComponent(objectPath)}`,
-            { method:"POST",
-              headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}`,
-                         "Content-Type": reqFile.blob.type || "application/octet-stream",
-                         "x-upsert": "true" },
-              body: reqFile.blob });
-          if(up.ok){
-            // Stamp the path on every occurrence row of this order.
-            const ids = saved.map(x=>x.id);
-            await fetch(`${SB_URL}/rest/v1/orders?id=in.(${ids.join(",")})`, {
-              method:"PATCH",
-              headers: { ...sbHeaders },
-              body: JSON.stringify({ requisition_path: objectPath })
-            });
-          } else {
-            console.error("requisition upload failed", up.status, await up.text());
-          }
-        } catch(upErr){
-          console.error("requisition upload error", upErr);
-          // Non-fatal: the order is saved; the file just didn't attach.
-        }
-      }
-
-      results.push({
-        name: fullName(p),
-        isReturning,
-        basis,
-        requestNo: priorCount + 1,
-        priorCount,
-        orderIds: saved.map(x=>x.id),
-        occurrences: saved.length
-      });
-    }
-    form.submitResults = results;
-    form.savedIds = results.flatMap(r=>r.orderIds);
-    return { ok:true };
-  } catch(e){
-    return { ok:false, error: e.message || "Network error" };
-  }
-}
-
-function showSubmitError(msg){
-  let box = document.getElementById("submitErr");
-  if(!box){
-    box = document.createElement("div");
-    box.id = "submitErr";
-    box.className = "err-msg show";
-    box.style.marginTop = "14px";
-    const nav = document.querySelector(".navrow");
-    if(nav && nav.parentNode) nav.parentNode.insertBefore(box, nav.nextSibling);
-  }
-  box.classList.add("show");
-  box.textContent = "Could not submit: " + msg + " — please try again or contact BMH.";
-}
-
-const today = new Date().toISOString().split("T")[0];
-
-const LAB_TESTS = [
-  {id:"CBC",  name:"CBC",         sub:"Complete Blood Count"},
-  {id:"CMP",  name:"CMP",         sub:"Comprehensive Metabolic"},
-  {id:"BMP",  name:"BMP",         sub:"Basic Metabolic"},
-  {id:"HbA1c",name:"HbA1c",       sub:"Hemoglobin A1c"},
-  {id:"Renal",name:"Renal Panel", sub:"Kidney function"},
-  {id:"Lipid",name:"Lipid Panel", sub:"Cholesterol / triglycerides"},
-  {id:"CRP",  name:"CRP",         sub:"C-Reactive Protein"},
-  {id:"VitD", name:"Vitamin D",   sub:"25-OH Vitamin D"},
-  {id:"PSA",  name:"PSA",         sub:"Prostate-Specific Antigen"},
-  {id:"Trop", name:"Troponin",    sub:"Cardiac marker"},
-];
-
-const CHECK_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l6 6L20 6"/></svg>`;
-
-// ---------- Data model ----------
-function blankPatient(){
-  return {
-    firstName:"", lastName:"", address:"", dob:"", telephone:"", mrn:"",
-    language:"English", languageOther:"", interpreterNeeded:false,
-    accessNotes:"", bestTime:"",
-    altName:"", altPhone:"", altTitle:"",
-    tests:[], otherTest:"",
-    recurring:null,          // null | true | false
-    recurDays:[],            // ["Mon","Tue",...]
-    recurWeeks:"",           // duration text (e.g. "4 weeks")
-    recurStart:"", recurEnd:"",
-    files:[], orderPaste:"",
-    physicianName:"", npi:""
-  };
-}
-
-const form = {
-  mode:"",                 // "single" | "batch"
-  patients:[blankPatient()],
-  current:0,               // index of patient being edited
-  submissionDate: today,
-  submittedBy:"", inputDate: today,
-  notifyEmail:"", notifyConsent:false
-};
-function P(){ return form.patients[form.current]; }
-
-// ---------- Helpers ----------
-function esc(s){ return (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
-function fmtDate(d){
-  if(!d) return "";
-  const s = String(d).trim();
-  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  return m ? `${m[2]}/${m[3]}/${m[1]}` : s;
-}
-function isValidNPI(n){ return /^\d{10}$/.test(n); }
-function fullName(p){ return (p.firstName+" "+p.lastName).trim(); }
-function testNames(p){
-  const names = p.tests.filter(t=>t!=='__other').map(id=>{ const t=LAB_TESTS.find(x=>x.id===id); return t?t.name:id; });
-  if(p.otherTest) names.push(p.otherTest+" (other)");
-  return names;
-}
-function testTags(p){
-  const n = testNames(p);
-  return n.length ? n.map(x=>`<span class="tag">${esc(x)}</span>`).join("") : "";
-}
-function recurSummary(p){
-  if(p.recurring!==true) return p.recurring===false ? "One-time draw" : "";
-  const days = p.recurDays.join(", ");
-  const dur = p.recurWeeks ? ` · ${esc(p.recurWeeks)}` : "";
-  const range = (p.recurStart||p.recurEnd) ? ` · ${fmtDate(p.recurStart)}–${fmtDate(p.recurEnd)}` : "";
-  return `Weekly (${days||"no days"})${dur}${range}`;
-}
-function notifySummary(){
-  if(!form.notifyConsent || !form.notifyEmail) return "Off";
-  return `On → ${esc(form.notifyEmail)} (scheduled & completed)`;
-}
-function navHTML(skippable=false, nextLabel="Continue →"){
-  return `<div class="navrow">
-    <button class="btn btn-primary" data-next>${nextLabel}</button>
-    ${skippable?'<button class="btn btn-ghost" data-next data-skip>Skip</button>':''}
-    <span class="enter-hint">press <kbd>Enter ↵</kbd></span>
-  </div>`;
-}
-function row(k,v){
-  const empty = !v || v==="";
-  return `<div class="review-row"><span class="k">${k}</span><span class="v ${empty?'empty':''}">${empty?'—':v}</span></div>`;
-}
-function ptChip(){
-  if(form.mode!=="batch") return "";
-  return `<div class="pt-chip"><span class="pulse"></span>Patient ${form.current+1}${fullName(P())?` · ${esc(fullName(P()))}`:""}</div>`;
-}
-
-// ---------- Slides ----------
-// The per-patient block (patient → altcontact → tests → upload → physician)
-// repeats in batch mode. "welcome" and "mode" run once up front; "gate",
-// "submitter", "review", "done" run once at the end.
-const slides = [
-
-  { key:"welcome", once:true, render: () => `
-    <div class="frame">
-      <div class="eyebrow"><span class="num">BMH</span> Mobile Lab Intake</div>
-      <h1 class="q">Let's get your draw order into the queue.</h1>
-      <p class="help">This form captures each patient, the tests ordered, and the ordering physician so our phlebotomist arrives ready. One section at a time.</p>
-      <div class="navrow">
-        <button class="btn btn-primary" data-next>Start intake &nbsp;→</button>
-        <span class="enter-hint">press <kbd>Enter ↵</kbd></span>
-      </div>
-    </div>` },
-
-  { key:"mode", once:true, render: () => `
-    <div class="frame">
-      <div class="eyebrow"><span class="num">00</span> Order type</div>
-      <h1 class="q">Is this one patient, or several?</h1>
-      <p class="help">If you're submitting for multiple patients, we'll walk each one through the same steps and build a roster before you submit.</p>
-      <div class="mode-grid">
-        <button class="mode-card" data-mode="single">
-          <span class="mi">🧍</span>
-          <h3>Individual order</h3>
-          <p>One patient, one order request.</p>
-        </button>
-        <button class="mode-card" data-mode="batch">
-          <span class="mi">👥</span>
-          <h3>Multiple orders</h3>
-          <p>Several patients — e.g. a facility, corporate wellness, or family batch.</p>
-        </button>
-      </div>
-    </div>` },
-
-  { key:"patient", perPatient:true, render: () => `
-    <div class="frame">
-      ${ptChip()}
-      <div class="eyebrow"><span class="num">01</span> Patient</div>
-      <h1 class="q">Who is the patient?</h1>
-      <p class="help">Name, DOB, address, and MRN as they appear in the ordering system.</p>
-      <div class="two-col">
-        <div class="field"><label>First name</label><input type="text" id="firstName" value="${esc(P().firstName)}" placeholder="Jane" autocomplete="off"></div>
-        <div class="field"><label>Last name</label><input type="text" id="lastName" value="${esc(P().lastName)}" placeholder="Doe" autocomplete="off"></div>
-      </div>
-      <div class="field">
-        <label>Service address — where the draw will happen</label>
-        <input type="text" id="address" value="${esc(P().address)}" placeholder="Street, city, state, ZIP" autocomplete="off">
-        <div class="hint-note">Our phlebotomist travels here. Include apartment/unit or facility room.</div>
-      </div>
-      <div class="two-col">
-        <div class="field"><label>Date of birth</label><input type="date" id="dob" value="${P().dob}" max="${today}"></div>
-        <div class="field"><label>Telephone</label><input type="text" id="telephone" value="${esc(P().telephone)}" placeholder="(000) 000-0000" inputmode="tel" autocomplete="off"></div>
-      </div>
-      <div class="two-col">
-        <div class="field">
-          <label>Patient's primary language</label>
-          <select id="language" class="sel-input">
-            ${["English","Spanish","French","Chinese","Korean","Japanese","Other"]
-              .map(l=>`<option value="${l}" ${P().language===l?"selected":""}>${l}</option>`).join("")}
-          </select>
-        </div>
-        <div class="field"><label>MRN (Medical Record Number)</label><input type="text" id="mrn" value="${esc(P().mrn)}" placeholder="e.g. 00483921" autocomplete="off"></div>
-      </div>
-      <div class="field" id="langOtherWrap" style="${P().language==="Other"?"":"display:none;"}">
-        <label>Which language?</label>
-        <input type="text" id="languageOther" value="${esc(P().languageOther)}" placeholder="Specify the language" autocomplete="off">
-      </div>
-      <div class="err-msg" id="err-patient">First name, last name, service address, date of birth, telephone, and MRN are all required.</div>
-      ${navHTML()}
-    </div>` },
-
-  { key:"altcontact", perPatient:true, render: () => `
-    <div class="frame">
-      ${ptChip()}
-      <div class="eyebrow"><span class="num">02</span> Access &amp; Contact</div>
-      <h1 class="q">How do we reach and get to this patient?</h1>
-      <p class="help">This is the section that decides whether a draw succeeds. Access details prevent wasted trips; an alternate contact prevents unreachable patients.</p>
-      <div class="field">
-        <label>Access instructions <span style="color:var(--ink-soft);font-weight:500;">— required</span></label>
-        <textarea id="accessNotes" style="min-height:78px;" placeholder="Gate code, buzzer, unit number, parking, dog on site, 'call on arrival', facility floor/room, best entrance...">${esc(P().accessNotes)}</textarea>
-      </div>
-      <div class="field">
-        <label>Best time to reach / draw</label>
-        <input type="text" id="bestTime" value="${esc(P().bestTime)}" placeholder="e.g. mornings before 11am, after dialysis Tue/Thu" autocomplete="off">
-      </div>
-      <div style="height:1px;background:var(--line);margin:20px 0 18px;"></div>
-      <p class="help" style="margin-bottom:16px;">If a caretaker, family member, or guardian is the bridge to communication, add them here.</p>
-      <div class="field"><label>Alternate contact name</label><input type="text" id="altName" value="${esc(P().altName)}" placeholder="Full name" autocomplete="off"></div>
-      <div class="two-col">
-        <div class="field"><label>Alternate contact number</label><input type="text" id="altPhone" value="${esc(P().altPhone)}" placeholder="(000) 000-0000" inputmode="tel" autocomplete="off"></div>
-        <div class="field"><label>Relationship / title</label><input type="text" id="altTitle" value="${esc(P().altTitle)}" placeholder="e.g. Daughter, Caretaker, POA" autocomplete="off"></div>
-      </div>
-      <div class="err-msg" id="err-access">Access instructions are required — this is the field that prevents wasted trips and unbillable draws.</div>
-      ${navHTML()}
-    </div>` },
-
-  { key:"tests", perPatient:true, render: () => `
-    <div class="frame">
-      ${ptChip()}
-      <div class="eyebrow"><span class="num">03</span> Order</div>
-      <h1 class="q">Which tests are ordered? <span class="opt">select all that apply</span></h1>
-      <p class="help">Tap to select. Choose <strong>Other</strong> to add a test that isn't listed.</p>
-      <div class="checks" id="checks">
-        ${LAB_TESTS.map(t=>`
-          <div class="check ${P().tests.includes(t.id)?'checked':''}" data-test="${t.id}">
-            <span class="box">${CHECK_SVG}</span>
-            <span class="label-txt">${t.name}<span class="sub">${t.sub}</span></span>
-          </div>`).join("")}
-        <div class="check ${(P().otherTest||P().tests.includes('__other'))?'checked':''}" data-test="__other" id="otherToggle">
-          <span class="box">${CHECK_SVG}</span>
-          <span class="label-txt">Other<span class="sub">Enter a custom test</span></span>
-        </div>
-      </div>
-      <div id="otherBox" class="${(P().otherTest||P().tests.includes('__other'))?'show':''}">
-        <input type="text" id="otherTest" value="${esc(P().otherTest)}" placeholder="Type the requested test(s) — e.g. Ferritin, TSH, HIV panel">
-      </div>
-      <div class="err-msg" id="err-tests">Select at least one test (or specify one under Other).</div>
-      ${navHTML()}
-    </div>` },
-
-  { key:"recurring", perPatient:true, render: () => {
-    const on = P().recurring===true;
-    const DAYS = [["Mon","Monday"],["Tue","Tuesday"],["Wed","Wednesday"],["Thu","Thursday"],["Fri","Friday"]];
-    return `
-    <div class="frame">
-      ${ptChip()}
-      <div class="eyebrow"><span class="num">04</span> Schedule</div>
-      <h1 class="q">Does this patient need a weekly blood draw?</h1>
-      <p class="help">If collections repeat on a set schedule, we'll standardize the route so the same window holds each week.</p>
-      <div class="mode-grid" id="recurToggle" style="margin-bottom:14px;">
-        <button class="mode-card ${P().recurring===false?'sel':''}" data-recur="no" style="padding:16px 18px;">
-          <h3 style="margin-bottom:2px;">No — one-time draw</h3>
-          <p>A single collection for this order.</p>
-        </button>
-        <button class="mode-card ${on?'sel':''}" data-recur="yes" style="padding:16px 18px;">
-          <h3 style="margin-bottom:2px;">Yes — weekly draws</h3>
-          <p>Recurring collections on set days.</p>
-        </button>
-      </div>
-
-      <div id="recurDetail" class="${on?'show':''}" style="${on?'':'display:none;'}">
-        <div class="field" style="margin-top:6px;">
-          <label>How many days a week — pick the collection days</label>
-          <div class="checks" id="dayChecks" style="margin-top:4px;">
-            ${DAYS.map(([k,full])=>`
-              <div class="check ${P().recurDays.includes(k)?'checked':''}" data-day="${k}" style="padding:11px 14px;">
-                <span class="box">${CHECK_SVG}</span>
-                <span class="label-txt">${full}</span>
-              </div>`).join("")}
-          </div>
-          <div id="dayCount" style="font-size:12.5px;color:var(--ink-soft);font-weight:600;margin-top:8px;">${P().recurDays.length? P().recurDays.length+" day(s)/week selected":"No days selected yet"}</div>
-        </div>
-
-        <div class="field">
-          <label>How long will the weekly draws run?</label>
-          <input type="text" id="recurWeeks" value="${esc(P().recurWeeks)}" placeholder="e.g. 4 weeks, 8 weeks, until further notice" autocomplete="off">
-        </div>
-
-        <div class="two-col">
-          <div class="field"><label>Weekly draw — start date</label><input type="date" id="recurStart" value="${P().recurStart}" min="${today}"></div>
-          <div class="field"><label>Weekly draw — end date</label><input type="date" id="recurEnd" value="${P().recurEnd}" min="${today}"></div>
-        </div>
-      </div>
-
-      <div class="err-msg" id="err-recur">For weekly draws, select at least one collection day and a start &amp; end date.</div>
-      ${navHTML()}
+function renderKpis(){
+  const c = counts();
+  const defs = [
+    {k:"all",       cls:"k-all",       n:c.all,       l:"All orders"},
+    {k:"overdue",   cls:"k-exception", n:c.overdue,   l:"Overdue"},
+    {k:"today",     cls:"k-assigned",  n:c.today,     l:"Due today"},
+    {k:"received",  cls:"k-received",  n:c.received,  l:"Unassigned"},
+    {k:"needsinfo", cls:"k-lab",       n:c.needsinfo, l:"Needs info"},
+    {k:"exception", cls:"k-exception", n:c.exception, l:"Exceptions"},
+  ];
+  document.getElementById("kpis").innerHTML = defs.map(d=>{
+    const on = (d.k==="all")
+      ? (filter.status==="all" && filter.type==="all")
+      : (filter.status===d.k || filter.type===d.k);
+    return `<div class="kpi ${d.cls} ${on?'active':''}" data-kpi="${d.k}">
+      <div class="n">${d.n}</div>
+      <div class="l">${d.l}</div>
     </div>`;
-  } },
-
-  { key:"upload", perPatient:true, render: () => `
-    <div class="frame">
-      ${ptChip()}
-      <div class="eyebrow"><span class="num">05</span> Order</div>
-      <h1 class="q">Attach the lab order.</h1>
-      <p class="help">Upload the signed order — PDF or photo — or paste the order text below.</p>
-      <div class="drop" id="drop">
-        <div class="ico">📄</div>
-        <div><strong>Click to upload</strong> or drag files here</div>
-        <small>PDF, JPG, PNG, HEIC · up to 15 MB each</small>
-        <input type="file" id="fileInput" multiple accept=".pdf,.jpg,.jpeg,.png,.heic" style="display:none">
-      </div>
-      <div id="fileList"></div>
-      <div class="divider-or">— OR PASTE ORDER DETAILS —</div>
-      <div class="field"><textarea id="orderPaste" placeholder="Paste the lab order text here if you don't have a file to upload...">${esc(P().orderPaste)}</textarea></div>
-      ${navHTML(true)}
-    </div>` },
-
-  { key:"physician", perPatient:true, render: () => `
-    <div class="frame">
-      ${ptChip()}
-      <div class="eyebrow"><span class="num">06</span> Ordering Physician</div>
-      <h1 class="q">Who ordered these labs?</h1>
-      <p class="help">The ordering provider's name and NPI must match the signed order.${form.mode==="batch"&&form.current>0?` <br>Different from the last patient? Update it here.`:""}</p>
-      <div class="field"><label>Physician name</label><input type="text" id="physicianName" value="${esc(P().physicianName)}" placeholder="Dr. Rory Silva" autocomplete="off"></div>
-      <div class="field"><label>Physician NPI number</label><input type="text" id="npi" value="${esc(P().npi)}" placeholder="10-digit NPI" inputmode="numeric" maxlength="10" autocomplete="off"></div>
-      <div class="err-msg" id="err-physician">Physician name and a valid 10-digit NPI are required.</div>
-      ${navHTML(false, form.mode==="batch" ? "Save patient →" : "Continue →")}
-    </div>` },
-
-  // Batch-only gate: shows roster, add another or finish
-  { key:"gate", once:true, batchOnly:true, render: () => `
-    <div class="frame">
-      <div class="eyebrow"><span class="num">◆</span> Batch roster</div>
-      <h1 class="q">${form.patients.length} patient${form.patients.length>1?"s":""} added. Add another or finish?</h1>
-      <p class="help">Each patient keeps its own tests, order, and ordering physician.</p>
-      <div class="roster" id="rosterList"></div>
-      <div class="add-row">
-        <button class="btn btn-add" id="addPatientBtn">＋ Add another patient</button>
-        <button class="btn btn-primary" data-next>Finish &amp; continue →</button>
-      </div>
-    </div>` },
-
-  { key:"submitter", once:true, render: () => `
-    <div class="frame">
-      <div class="eyebrow"><span class="num">06</span> Submitter</div>
-      <h1 class="q">Last step — who's submitting this?</h1>
-      <p class="help">Your name and today's date for the intake record.${form.mode==="batch"?` This applies to the whole batch of ${form.patients.length}.`:""}</p>
-      <div class="field"><label>Submitted by</label><input type="text" id="submittedBy" value="${esc(form.submittedBy)}" placeholder="Your full name" autocomplete="off"></div>
-      <div class="field"><label>Date of submission</label><input type="date" id="submissionDate" value="${form.submissionDate}"></div>
-
-      <div class="notify-block">
-        <div class="notify-head"><span class="ni">🔔</span> Appointment notifications</div>
-        <p class="notify-sub">We'll email this address when the draw is <strong>scheduled</strong> and again when it's <strong>completed</strong>.</p>
-        <div class="field" style="margin-bottom:12px;"><label>Notification email</label><input type="text" id="notifyEmail" value="${esc(form.notifyEmail)}" placeholder="name@company.com" inputmode="email" autocomplete="off"></div>
-        <div class="check ${form.notifyConsent?'checked':''}" id="consentCheck" style="padding:12px 14px;">
-          <span class="box">${CHECK_SVG}</span>
-          <span class="label-txt" style="font-size:14px;font-weight:600;">Send me email updates for this ${form.mode==="batch"?"batch":"order"}<span class="sub">Scheduled &amp; completed status only — no marketing.</span></span>
-        </div>
-      </div>
-
-      <div class="err-msg" id="err-submitter">Please enter who is submitting this form.</div>
-      ${navHTML(false,"Review →")}
-    </div>` },
-
-  { key:"review", once:true, render: () => `
-    <div class="frame">
-      <div class="eyebrow"><span class="num">07</span> Review</div>
-      <h1 class="q">Confirm before you submit.</h1>
-      ${form.mode==="batch" ? reviewBatch() : reviewSingle()}
-      <div class="navrow">
-        <button class="btn btn-ghost" data-prev>← Edit</button>
-        <button class="btn btn-primary" id="submitBtn">Submit intake ✓</button>
-      </div>
-      <div class="confid">
-        <span>🔒</span>
-        <span>Protected health information. Handled under BMH HIPAA safeguards — access is logged and restricted to authorized staff.</span>
-      </div>
-    </div>` },
-
-  { key:"done", once:true, render: () => `
-    <div class="frame" style="text-align:center; display:flex; flex-direction:column; align-items:center;">
-      <div id="successCheck"><svg viewBox="0 0 24 24" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l6 6L20 6"/></svg></div>
-      <h1 class="q">Intake received.</h1>
-      <p class="help" style="text-align:center;">${form.mode==="batch"
-        ? `<strong>${form.patients.length} orders</strong> are in the queue. Our dispatch team will confirm draw windows shortly.`
-        : `The order for <strong>${esc(fullName(form.patients[0])||"the patient")}</strong> is in the queue. Our dispatch team will confirm a draw window shortly.`}</p>
-      ${(form.notifyConsent && form.notifyEmail) ? `<div class="notify-confirm">🔔 We'll email <strong>${esc(form.notifyEmail)}</strong> when it's scheduled and again when it's completed.</div>` : ""}
-      ${(form.submitResults && form.submitResults.length) ? form.submitResults.map(r=>`
-        <div class="match-banner" style="text-align:left;">
-          ${r.isReturning
-            ? `<strong>${esc(r.name)}</strong> is already in our system — matched on ${esc(r.basis)}.
-               This order was added as <span class="rq">Request ${r.requestNo}</span>
-               <div style="margin-top:6px;font-size:12.5px;opacity:.85;">${r.priorCount} previous request${r.priorCount===1?"":"s"} on file · history linked</div>`
-            : `<strong>${esc(r.name)}</strong> added as a new patient — <span class="rq">Request 1</span>`}
-          ${r.occurrences>1 ? `<div style="margin-top:8px;font-size:12.5px;">📅 <strong>${r.occurrences} weekly draws</strong> scheduled and individually tracked.</div>` : ""}
-        </div>`).join("") : ""}
-      ${(form.savedIds && form.savedIds.length) ? `<div style="margin-top:12px;font-size:13px;color:var(--ink-soft);">Order reference${form.savedIds.length>1?"s":""}: <strong style="color:var(--brand);font-variant-numeric:tabular-nums;">${form.savedIds.slice(0,6).join(", ")}${form.savedIds.length>6?` +${form.savedIds.length-6} more`:""}</strong></div>` : ""}
-      <div class="navrow" style="justify-content:center;">
-        <button class="btn btn-primary" id="newBtn">New intake</button>
-      </div>
-    </div>` },
-];
-
-function reviewSingle(){
-  const p = form.patients[0];
-  return `<div class="review-card">
-    ${row("Patient", fullName(p))}
-    ${row("Date of birth", fmtDate(p.dob))}
-    ${row("Address", p.address)}
-    ${row("Telephone", p.telephone)}
-    ${row("Language", p.language === "Other" ? (p.languageOther||"Other") : p.language)}
-    ${row("Access instructions", p.accessNotes)}
-    ${row("Best time", p.bestTime)}
-    ${row("MRN", p.mrn)}
-    ${row("Alternate contact", [p.altName, p.altTitle?("("+p.altTitle+")"):""].filter(Boolean).join(" "))}
-    ${row("Alternate number", p.altPhone)}
-    ${row("Tests ordered", testTags(p))}
-    ${row("Weekly draw", recurSummary(p))}
-    ${row("Attachments", p.files.length ? p.files.map(f=>f.name).join(", ") : (p.orderPaste?"Order pasted (text)":""))}
-    ${row("Ordering physician", p.physicianName)}
-    ${row("NPI", p.npi)}
-    ${row("Submitted by", form.submittedBy)}
-    ${row("Date of submission", fmtDate(form.submissionDate))}
-    ${row("Email notifications", notifySummary())}
-  </div>`;
-}
-function reviewBatch(){
-  const cards = form.patients.map((p,i)=>`
-    <div class="review-card">
-      <div class="review-row"><span class="k" style="color:var(--brand);font-weight:700;">Patient ${i+1}</span><span class="v">${esc(fullName(p))||"—"}</span></div>
-      ${row("Date of birth", fmtDate(p.dob))}
-      ${row("Telephone", p.telephone)}
-      ${row("Language", p.language === "Other" ? (p.languageOther||"Other") : p.language)}
-      ${row("Access", p.accessNotes)}
-      ${row("MRN", p.mrn)}
-      ${row("Alt contact", [p.altName, p.altTitle?("("+p.altTitle+")"):""].filter(Boolean).join(" "))}
-      ${row("Tests", testTags(p))}
-      ${row("Weekly draw", recurSummary(p))}
-      ${row("Attachments", p.files.length ? p.files.map(f=>f.name).join(", ") : (p.orderPaste?"Order pasted (text)":""))}
-      ${row("Physician / NPI", [p.physicianName, p.npi].filter(Boolean).join(" · "))}
-    </div>`).join("");
-  return cards + `<div class="review-card">
-    ${row("Submitted by", form.submittedBy)}
-    ${row("Date of submission", fmtDate(form.submissionDate))}
-    ${row("Email notifications", notifySummary())}
-  </div>`;
-}
-
-// ---------- Flow control ----------
-// Build the active slide sequence based on mode.
-function sequence(){
-  return slides.filter(s=>{
-    if(s.batchOnly && form.mode!=="batch") return false;
-    return true;
+  }).join("");
+  const TYPE_KPIS = ["overdue","today","needsinfo"];
+  document.querySelectorAll("[data-kpi]").forEach(el=>{
+    el.onclick = ()=>{
+      const k = el.dataset.kpi;
+      if(k==="all"){ filter.status="all"; filter.type="all"; }
+      else if(TYPE_KPIS.includes(k)){
+        filter.type = filter.type===k ? "all" : k;
+        filter.status = "all";
+      } else {
+        filter.status = filter.status===k ? "all" : k;
+        filter.type = "all";
+      }
+      syncChips();
+      render();
+    };
   });
 }
-let seq = sequence();
-let idx = 0;
-let els = [];
 
-const viewport = document.getElementById("viewport");
-
-function rebuildSeq(){
-  seq = sequence();
-}
-
-function render(){
-  const s = seq[idx];
-  viewport.innerHTML = "";
-  const div = document.createElement("div");
-  div.className = "slide active";
-  div.innerHTML = s.render();
-  viewport.appendChild(div);
-  els = [div];
-  wire();
-  updateChrome();
-  setTimeout(()=>{
-    const inp = div.querySelector("input:not([type=file]), textarea");
-    if(inp && s.key!=="altcontact" && s.key!=="review" && s.key!=="mode" && s.key!=="gate" && s.key!=="recurring") inp.focus();
-  }, 60);
-}
-
-function go(n, dir){
-  const cur = els[0];
-  if(cur){
-    cur.classList.remove("active");
-    cur.classList.add(dir==="up"?"exit-up":"");
-    cur.style.opacity = "0";
+function matches(r){
+  const t = filter.type;
+  if(t==="recurring"  && !r.recurring) return false;
+  if(t==="needsinfo"  && r.billingReady) return false;
+  if(t==="exceptions" && !EXCEPTION.includes(r.status)) return false;
+  if(["overdue","today","week","upcoming"].includes(t)){
+    const b = dueBucket(r.requestedDate).key;
+    if(t==="week"){ if(!["today","week"].includes(b)) return false; }
+    else if(b !== t) return false;
   }
-  idx = Math.max(0, Math.min(seq.length-1, n));
-  setTimeout(render, 180);
-}
-
-function updateChrome(){
-  const total = seq.length;
-  document.getElementById("progressBar").style.width = ((idx)/(total-1)*100)+"%";
-  const s = seq[idx];
-  let label;
-  if(s.key==="done") label = "Complete";
-  else if(s.key==="mode"||s.key==="welcome") label = "Getting started";
-  else if(form.mode==="batch" && s.perPatient) label = `Patient ${form.current+1} · ${humanStep()}`;
-  else label = humanStep();
-  document.getElementById("stepCount").textContent = label;
-  document.getElementById("upBtn").disabled = idx===0;
-  document.getElementById("downBtn").disabled = idx>=seq.length-1;
-}
-function humanStep(){
-  const n = seq.slice(0, idx+1).filter(s=>!["welcome","mode","done"].includes(s.key)).length;
-  const tot = seq.filter(s=>!["welcome","mode","done"].includes(s.key)).length;
-  return `${n} → ${tot}`;
-}
-
-// ---------- Save current slide into model ----------
-function save(){
-  const s = seq[idx];
-  const cur = els[0];
-  if(!cur) return;
-  const g = id => { const el = cur.querySelector("#"+id); return el?el.value.trim():undefined; };
-
-  if(s.perPatient){
-    const p = P();
-    ["firstName","lastName","address","dob","telephone","mrn",
-     "altName","altPhone","altTitle","otherTest","physicianName","npi",
-     "recurWeeks","recurStart","recurEnd","bestTime","language","languageOther"].forEach(f=>{
-      const v = g(f); if(v!==undefined) p[f]=v;
-    });
-    const acc = cur.querySelector("#accessNotes"); if(acc) p.accessNotes = acc.value.trim();
-    const paste = cur.querySelector("#orderPaste"); if(paste) p.orderPaste = paste.value;
-    // tests + files handled live
+  // status filter (from KPI)
+  if(filter.status!=="all"){
+    if(filter.status==="exception"){ if(!EXCEPTION.includes(r.status)) return false; }
+    else if(r.status!==filter.status) return false;
   }
-  if(s.key==="submitter"){
-    const sb=g("submittedBy"); if(sb!==undefined) form.submittedBy=sb;
-    const sd=g("submissionDate"); if(sd!==undefined) form.submissionDate=sd;
-    form.inputDate = form.submissionDate;
-    const ne=g("notifyEmail"); if(ne!==undefined) form.notifyEmail=ne;
-  }
-}
-
-// ---------- Validation ----------
-function validate(){
-  const k = seq[idx].key;
-  save();
-  if(k==="patient"){
-    const p=P();
-    if(!p.firstName||!p.lastName||!p.address||!p.dob||!p.telephone||!p.mrn){ flag("err-patient"); return false; }
-    if(p.language==="Other" && !p.languageOther){
-      flag("err-patient");
-      const em=document.getElementById("err-patient");
-      if(em) em.textContent="Please specify which language the patient speaks.";
-      return false;
-    }
-  }
-  if(k==="altcontact"){
-    const p=P();
-    if(!p.accessNotes){ flag("err-access"); return false; }
-  }
-  if(k==="tests"){
-    const p=P();
-    const presets = p.tests.filter(t=>t!=='__other').length>0;
-    const otherChecked = p.tests.includes('__other');
-    const otherFilled = p.otherTest.trim()!=="";
-    if(!(presets||otherFilled)){
-      flag("err-tests");
-      const em=document.getElementById("err-tests");
-      if(em) em.textContent = otherChecked && !otherFilled
-        ? "You selected Other — type the requested test in the box to continue."
-        : "Select at least one test (or specify one under Other).";
-      return false;
-    }
-  }
-  if(k==="recurring"){
-    const p=P();
-    if(p.recurring===null){ flag("err-recur"); const em=document.getElementById("err-recur"); if(em) em.textContent="Choose whether this patient needs a weekly draw."; return false; }
-    if(p.recurring===true){
-      if(p.recurDays.length===0 || !p.recurStart || !p.recurEnd){ flag("err-recur"); const em=document.getElementById("err-recur"); if(em) em.textContent="For weekly draws, select at least one collection day and a start & end date."; return false; }
-      if(p.recurEnd < p.recurStart){ flag("err-recur"); const em=document.getElementById("err-recur"); if(em) em.textContent="End date can't be before the start date."; return false; }
-    }
-  }
-  if(k==="physician"){
-    const p=P();
-    if(!p.physicianName || !isValidNPI(p.npi)){ flag("err-physician"); return false; }
-  }
-  if(k==="submitter"){
-    if(!form.submittedBy){ flag("err-submitter"); const em=document.getElementById("err-submitter"); if(em) em.textContent="Please enter who is submitting this form."; return false; }
-    if(form.notifyConsent){
-      const ok = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.notifyEmail);
-      if(!ok){ flag("err-submitter"); const em=document.getElementById("err-submitter"); if(em) em.textContent="Enter a valid notification email, or uncheck email updates."; return false; }
-    }
+  // search
+  if(filter.q){
+    const hay = `${r.first} ${r.last} ${r.mrn} ${r.physician} ${r.npi} ${r.id} ${r.submittedBy} ${r.phone} ${r.address} ${r.language} ${r.assignee}`.toLowerCase();
+    if(!hay.includes(filter.q.toLowerCase())) return false;
   }
   return true;
 }
-function flag(id){ const e=document.querySelector("#"+id); if(e) e.classList.add("show"); }
 
-// ---------- Next / Prev with batch logic ----------
-function next(skip=false){
-  const k = seq[idx].key;
-  if(!skip && !validate()) return; else save();
+function fmt(d){
+  if(!d) return "—";
+  const s = String(d).trim();
+  // Handles "1931-12-09T00:00:00.000Z", "2026-07-23", and "2026-07-23 12:47:21+00"
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if(m) return `${m[2]}/${m[3]}/${m[1]}`;
+  const us = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if(us) return s;
+  return s.slice(0,10);
+}
+const REQ_COLORS=["#12507a","#c07d1e","#7a3fa0","#1e7a53","#b23a3a","#0f766e"];
+function reqColor(n){ return REQ_COLORS[((n||1)-1) % REQ_COLORS.length]; }
+function escapeHtml(s){ return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
 
-  // End of a patient's physician step in batch mode → go to gate
-  if(k==="physician" && form.mode==="batch"){
-    // jump to gate slide
-    const gateIdx = seq.findIndex(s=>s.key==="gate");
-    go(gateIdx, "up");
-    return;
-  }
-  if(idx < seq.length-1) go(idx+1, "up");
-}
-function prev(){ save(); if(idx>0) go(idx-1, "down"); }
-
-// ---------- Add / edit / delete patient (batch) ----------
-function startNewPatient(){
-  form.patients.push(blankPatient());
-  form.current = form.patients.length-1;
-  const patientIdx = seq.findIndex(s=>s.key==="patient");
-  go(patientIdx, "up");
-}
-function editPatient(i){
-  form.current = i;
-  const patientIdx = seq.findIndex(s=>s.key==="patient");
-  go(patientIdx, "up");
-}
-function deletePatient(i){
-  form.patients.splice(i,1);
-  if(form.patients.length===0){ form.patients.push(blankPatient()); }
-  form.current = Math.min(form.current, form.patients.length-1);
-  render(); // refresh gate
+// Date-driven queue: the fix for "order 10 days out with no tracing".
+function todayISO(){ return new Date().toISOString().slice(0,10); }
+function dueBucket(d){
+  if(!d) return {key:"undated", label:"No date", cls:"d-none"};
+  const t = todayISO();
+  const diff = Math.round((new Date(d+"T00:00:00") - new Date(t+"T00:00:00"))/86400000);
+  if(diff < 0)  return {key:"overdue",  label:`${Math.abs(diff)}d overdue`, cls:"d-over"};
+  if(diff === 0)return {key:"today",    label:"Today",        cls:"d-today"};
+  if(diff <= 7) return {key:"week",     label:`In ${diff}d`,  cls:"d-week"};
+  return           {key:"upcoming", label:`In ${diff}d`,  cls:"d-up"};
 }
 
-// ---------- Wire per-render ----------
-function wire(){
-  const cur = els[0];
+// Short, human-readable reference. Raw UUIDs (from ghl_webhook) get
+// shortened; BMH-format ids pass through untouched.
+function refOf(id){
+  if(!id) return "";
+  const s = String(id);
+  if(/^BMH-/i.test(s)) return s;
+  if(/^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(s)) return "#" + s.slice(0,8).toUpperCase();
+  return s.length > 14 ? s.slice(0,14) + "…" : s;
+}
 
-  cur.querySelectorAll("[data-next]").forEach(b=> b.onclick = ()=> next(b.hasAttribute("data-skip")));
-  cur.querySelectorAll("[data-prev]").forEach(b=> b.onclick = prev);
-
-  // mode select
-  cur.querySelectorAll("[data-mode]").forEach(b=>{
-    b.onclick = ()=>{
-      form.mode = b.dataset.mode;
-      form.current = 0;
-      form.patients = [blankPatient()];
-      rebuildSeq();
-      go(idx+1, "up");
-    };
+function renderTable(){
+  let list = rows.filter(matches);
+  // Date sort — undated rows always sink to the bottom regardless of direction.
+  list.sort((a,b)=>{
+    const da = a.requestedDate, db = b.requestedDate;
+    if(!da && !db) return 0;
+    if(!da) return 1;
+    if(!db) return -1;
+    return dateSortDir==="asc" ? da.localeCompare(db) : db.localeCompare(da);
   });
+  const tbody = document.getElementById("tbody");
+  const empty = document.getElementById("emptyState");
+  if(!list.length){ tbody.innerHTML=""; empty.style.display="block"; return; }
+  empty.style.display="none";
+  tbody.innerHTML = list.map(r=>{
+    const st = statusOf(r.status);
+    const testTags = r.tests.slice(0,4).map(t=>`<span class="tag">${t}</span>`).join("")
+      + (r.tests.length>4?`<span class="tag">+${r.tests.length-4}</span>`:"");
+    const rq = `<span class="rq-badge" style="background:${reqColor(r.requestNo)}">R${r.requestNo}</span>`;
+    const orgChip = r.orgName ? `<span class="org-chip" style="background:${r.orgBg};color:${r.orgColor}">${r.orgName}</span>` : "";
+    const lang = r.language && r.language!=="English"
+      ? `<span class="lang-chip">${r.language==="Other"?(r.languageOther||"Other"):r.language}</span>` : "";
+    const sched = r.recurring
+      ? `<span class="tag recur">Weekly ${r.occIndex||1}/${r.occTotal||1}</span>`
+      : `<span class="pt-meta">One-time</span>`;
+    const due = dueBucket(r.requestedDate);
+    const notify = r.notify
+      ? `<span class="badge-notify">● on</span>`
+      : `<span class="badge-notify off">off</span>`;
+    const flag = r.billingReady
+      ? `<span class="ok-chip">✓ ready</span>`
+      : `<span class="warn-chip" title="Missing: ${r.missing.join(', ')}">⚠ ${r.missing.length} missing</span>`;
+    return `<tr data-id="${r.id}" class="row-${r.status} row-click">
+      <td>
+        <div class="pt-name">${rq}${r.last}, ${r.first} ${lang}${orgChip}</div>
+        <div class="pt-meta mono">${refOf(r.id)}${r.dob?` · DOB ${fmt(r.dob)}`:""}</div>
+        ${r.accessNotes?`<div class="pt-meta acc">🔑 ${escapeHtml(r.accessNotes).slice(0,60)}</div>`:""}
+      </td>
+      <td class="mono">${r.mrn}</td>
+      <td><div class="tests-cell">${testTags}</div></td>
+      <td>
+        <div class="due ${due.cls}">${r.requestedDate?fmt(r.requestedDate):"—"}</div>
+        <div class="pt-meta">${due.label}</div>
+        ${sched}
+      </td>
+      <td>${r.physician}<div class="pt-meta mono">NPI ${r.npi}</div></td>
+      <td>${flag}<div class="pt-meta">${notify}</div></td>
+      <td>
+        <div class="status-wrap">
+          <select class="status ${st.cls}" data-sid="${r.id}">
+            ${STATUSES.map(s=>`<option value="${s.id}" ${s.id===r.status?'selected':''}>${s.label}</option>`).join("")}
+          </select>
+        </div>
+      </td>
+    </tr>`;
+  }).join("");
 
-  // clear errors on input
-  cur.querySelectorAll("input, textarea").forEach(inp=>{
-    inp.addEventListener("input", ()=>{
-      const em = inp.closest(".frame")?.querySelector(".err-msg.show");
-      if(em) em.classList.remove("show");
-    });
-  });
-
-  // tests
-  const checks = cur.querySelector("#checks");
-  if(checks){
-    checks.querySelectorAll(".check").forEach(c=>{
-      c.onclick = ()=>{
-        const id=c.dataset.test; const p=P();
-        c.classList.toggle("checked");
-        const on=c.classList.contains("checked");
-        if(id==="__other"){
-          const box=cur.querySelector("#otherBox");
-          box.classList.toggle("show", on);
-          if(on){ setTimeout(()=>cur.querySelector("#otherTest").focus(),50); }
-          else { cur.querySelector("#otherTest").value=""; p.otherTest=""; }
-        }
-        // maintain array
-        if(on){ if(!p.tests.includes(id)) p.tests.push(id); }
-        else { p.tests = p.tests.filter(t=>t!==id); }
-      };
-    });
-    const ot = cur.querySelector("#otherTest");
-    if(ot) ot.addEventListener("input", ()=> P().otherTest = ot.value.trim());
-  }
-
-  // recurring draw toggle
-  const recurToggle = cur.querySelector("#recurToggle");
-  if(recurToggle){
-    const detail = cur.querySelector("#recurDetail");
-    recurToggle.querySelectorAll("[data-recur]").forEach(b=>{
-      b.onclick = ()=>{
-        const yes = b.dataset.recur==="yes";
-        P().recurring = yes;
-        recurToggle.querySelectorAll(".mode-card").forEach(c=>c.classList.remove("sel"));
-        b.classList.add("sel");
-        if(yes){ detail.style.display=""; detail.classList.add("show"); }
-        else { detail.style.display="none"; detail.classList.remove("show"); }
-        const em = cur.querySelector("#err-recur"); if(em) em.classList.remove("show");
-      };
-    });
-    const dayChecks = cur.querySelector("#dayChecks");
-    if(dayChecks){
-      const counter = cur.querySelector("#dayCount");
-      dayChecks.querySelectorAll(".check").forEach(c=>{
-        c.onclick = ()=>{
-          const k=c.dataset.day; const p=P();
-          c.classList.toggle("checked");
-          if(c.classList.contains("checked")){ if(!p.recurDays.includes(k)) p.recurDays.push(k); }
-          else { p.recurDays = p.recurDays.filter(d=>d!==k); }
-          // keep Mon–Fri order
-          const order=["Mon","Tue","Wed","Thu","Fri"];
-          p.recurDays.sort((a,b)=>order.indexOf(a)-order.indexOf(b));
-          if(counter) counter.textContent = p.recurDays.length ? p.recurDays.length+" day(s)/week selected" : "No days selected yet";
-          const em = cur.querySelector("#err-recur"); if(em) em.classList.remove("show");
-        };
-      });
-    }
-  }
-
-  // upload
-  const drop = cur.querySelector("#drop");
-  const fileInput = cur.querySelector("#fileInput");
-  if(drop){
-    drop.onclick = ()=> fileInput.click();
-    fileInput.onchange = ()=> addFiles(fileInput.files);
-    ["dragover","dragenter"].forEach(ev=> drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add("drag");}));
-    ["dragleave","drop"].forEach(ev=> drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove("drag");}));
-    drop.addEventListener("drop", e=> addFiles(e.dataTransfer.files));
-    renderFiles();
-  }
-
-  // NPI digits only
-  const npi = cur.querySelector("#npi");
-  if(npi) npi.addEventListener("input", ()=> npi.value = npi.value.replace(/\D/g,"").slice(0,10));
-
-  // language "Other" reveal
-  const langSel = cur.querySelector("#language");
-  if(langSel){
-    langSel.onchange = ()=>{
-      P().language = langSel.value;
-      const w = cur.querySelector("#langOtherWrap");
-      if(w){
-        const on = langSel.value==="Other";
-        w.style.display = on ? "" : "none";
-        if(on){ const i=cur.querySelector("#languageOther"); if(i) setTimeout(()=>i.focus(),50); }
-        else { const i=cur.querySelector("#languageOther"); if(i) i.value=""; P().languageOther=""; }
+  tbody.querySelectorAll("select.status").forEach(sel=>{
+    sel.onchange = async ()=>{
+      const id = sel.dataset.sid;
+      const row = rows.find(x=>x.id===id);
+      const old = row.status;
+      const next = sel.value;
+      sel.disabled = true;
+      sel.className = "status " + statusOf(next).cls;
+      try {
+        await updateStatus(id, next);
+        row.status = next;
+        renderKpis();
+        notifyFlash(row, old, next);
+      } catch(e){
+        sel.value = old;
+        sel.className = "status " + statusOf(old).cls;
+        document.getElementById("flashMsg").textContent = "Update failed — " + e.message;
+        const f=document.getElementById("flash"); f.classList.add("show");
+        clearTimeout(window._ft); window._ft=setTimeout(()=>f.classList.remove("show"),4000);
+      } finally {
+        sel.disabled = false;
       }
-      const em = cur.querySelector("#err-patient"); if(em) em.classList.remove("show");
     };
+  });
+
+  // Clicking a row opens the order detail — but not when using the status dropdown.
+  tbody.querySelectorAll("tr.row-click").forEach(tr=>{
+    tr.addEventListener("click", e=>{
+      if(e.target.closest(".status-wrap")) return; // let the dropdown work
+      openDetail(tr.dataset.id);
+    });
+  });
+}
+
+function openDetail(id){
+  const r = rows.find(x=>x.id===id);
+  if(!r) return;
+  const due = dueBucket(r.requestedDate);
+  const st = statusOf(r.status);
+  const testList = r.tests.length ? r.tests.map(t=>`<span class="tag">${t}</span>`).join("") : '<span class="pt-meta">—</span>';
+  const billing = r.billingReady
+    ? `<span class="ok-chip">✓ ready to bill</span>`
+    : `<span class="warn-chip">⚠ missing: ${r.missing.join(', ')||'—'}</span>`;
+  const recur = r.recurring ? `Weekly · occurrence ${r.occIndex||1} of ${r.occTotal||1}` : "One-time draw";
+  const langLine = r.language && r.language!=="English"
+    ? `${r.language==="Other"?(r.languageOther||"Other"):r.language}${r.interpreter?' · interpreter needed':''}` : "English";
+
+  document.getElementById("detailBody").innerHTML = `
+    <div class="dt-head">
+      <div>
+        <div class="dt-name">${rqBadge(r.requestNo)} ${r.last}, ${r.first}
+          ${r.orgName?`<span class="org-chip" style="background:${r.orgBg};color:${r.orgColor}">${r.orgName}</span>`:""}</div>
+        <div class="dt-sub mono">${refOf(r.id)}${r.mrn&&r.mrn!=="—"?` · MRN ${r.mrn}`:""}</div>
+      </div>
+      <span class="dt-status" style="background:${st.color}">${st.label}</span>
+    </div>
+    <div class="dt-grid">
+      ${dtField("Draw date", r.requestedDate?`${fmt(r.requestedDate)} <span class="due ${due.cls}">${due.label}</span>`:"Not scheduled")}
+      ${dtField("Schedule", recur)}
+      ${dtField("Date of birth", r.dob?fmt(r.dob):"—")}
+      ${dtField("Phone", r.phone||"—")}
+      ${dtField("Language", langLine)}
+      ${dtField("Tests ordered", testList, true)}
+      ${dtField("Service address", r.address||'<span class="warn-chip">⚠ missing</span>', true)}
+      ${dtField("Access notes", r.accessNotes?`🔑 ${escapeHtml(r.accessNotes)}`:"—", true)}
+      ${dtField("Best time", r.bestTime||"—")}
+      ${dtField("Physician", `${r.physician}${r.npi&&r.npi!=="—"?` · NPI ${r.npi}`:""}`)}
+      ${dtField("Assigned to", r.assignee||'<span class="pt-meta">Unassigned</span>')}
+      ${dtField("Billing", billing, true)}
+      ${dtField("Requisition", r.requisitionPath
+        ? `<button class="req-btn" onclick="viewRequisition('${r.id}')">📄 View / print requisition</button>`
+        : '<span class="warn-chip">⚠ none uploaded</span>', true)}
+      ${dtField("Submitted", `${r.submittedDate?fmt(r.submittedDate):"—"} by ${r.submittedBy}`, true)}
+      ${dtField("Notify", r.notify||"Off")}
+    </div>`;
+  document.getElementById("detailOverlay").classList.add("show");
+}
+function dtField(label, val, wide){
+  return `<div class="dt-field${wide?' wide':''}"><div class="dt-label">${label}</div><div class="dt-val">${val}</div></div>`;
+}
+function rqBadge(n){ return `<span class="rq-badge" style="background:${reqColor(n)}">R${n}</span>`; }
+function closeDetail(){ document.getElementById("detailOverlay").classList.remove("show"); }
+
+// Fetch a short-lived signed URL from Railway and open the requisition.
+async function viewRequisition(orderId){
+  try {
+    const r = await fetch(`/api/requisition/${encodeURIComponent(orderId)}`, { credentials:"same-origin" });
+    const j = await r.json();
+    if(!r.ok || !j.url){ alert(j.error || "Could not open requisition."); return; }
+    window.open(j.url, "_blank", "noopener");
+  } catch(e){ alert("Error opening requisition: " + e.message); }
+}
+
+function syncChips(){
+  document.querySelectorAll("[data-type]").forEach(c=>{
+    c.classList.toggle("on", c.dataset.type===filter.type);
+  });
+}
+
+function render(){
+  document.getElementById("tableTitle").textContent = titleText();
+  renderKpis();
+  renderTable();
+}
+function statusLabelForTitle(k){
+  if(k==="exception") return "Exceptions — no show / unable to reach";
+  if(k==="lab") return "Dropped off at lab";
+  const s = STATUSES.find(x=>x.id===k);
+  return s ? s.label : "Orders";
+}
+function titleText(){
+  const T={overdue:"Overdue draws",today:"Due today",week:"Due this week",
+    upcoming:"Upcoming draws",recurring:"Weekly recurring draws",
+    needsinfo:"Needs info — not billing-ready",exceptions:"Exceptions"};
+  if(filter.type!=="all" && T[filter.type]) return T[filter.type];
+  if(filter.status!=="all") return statusLabelForTitle(filter.status);
+  return "All orders";
+}
+
+// ---------- Notification simulation feedback ----------
+function notifyFlash(row, oldStatus, newStatus){
+  let msg = `${row.first} ${row.last} → ${statusOf(newStatus).label}`;
+  const triggers = { assigned:"scheduled", completed:"completed" };
+  if(triggers[newStatus] && row.notify){
+    msg = `📧 Notification sent to ${row.notify} — draw ${triggers[newStatus]}`;
+  } else if(EXCEPTION.includes(newStatus)){
+    msg = `⚠️ ${row.first} ${row.last} flagged: ${statusOf(newStatus).label}`;
   }
+  const f = document.getElementById("flash");
+  document.getElementById("flashMsg").textContent = msg;
+  f.classList.add("show");
+  clearTimeout(window._ft);
+  window._ft = setTimeout(()=> f.classList.remove("show"), 2600);
+}
 
-  // notification consent
-  const consent = cur.querySelector("#consentCheck");
-  if(consent){
-    consent.onclick = ()=>{
-      consent.classList.toggle("checked");
-      form.notifyConsent = consent.classList.contains("checked");
-      const em = cur.querySelector("#err-submitter"); if(em) em.classList.remove("show");
-      if(form.notifyConsent){ const ne=cur.querySelector("#notifyEmail"); if(ne && !ne.value){ setTimeout(()=>ne.focus(),50); } }
-    };
-  }
-
-  // gate roster
-  const rl = cur.querySelector("#rosterList");
-  if(rl) renderRoster(rl);
-  const addBtn = cur.querySelector("#addPatientBtn");
-  if(addBtn) addBtn.onclick = startNewPatient;
-
-  // submit / restart
-  const sb = cur.querySelector("#submitBtn");
-  if(sb) sb.onclick = async ()=>{
-    sb.disabled = true;
-    const orig = sb.textContent;
-    sb.textContent = "Submitting...";
-    const res = await submitToSupabase();
-    if(res.ok){
-      const di=seq.findIndex(s=>s.key==="done"); go(di,"up");
-    } else {
-      sb.disabled = false; sb.textContent = orig;
-      showSubmitError(res.error);
-    }
+// ---------- Filters + search ----------
+document.querySelectorAll("[data-type]").forEach(chip=>{
+  chip.onclick = ()=>{
+    filter.type = chip.dataset.type;
+    filter.status = "all";
+    syncChips();
+    render();
   };
-  const nb = cur.querySelector("#newBtn");
-  if(nb) nb.onclick = ()=> location.reload();
-}
-
-function renderRoster(el){
-  if(form.patients.length===0){ el.innerHTML = `<div class="roster-empty">No patients yet.</div>`; return; }
-  el.innerHTML = form.patients.map((p,i)=>`
-    <div class="roster-item">
-      <span class="idx">${i+1}</span>
-      <div class="meta">
-        <div class="rn">${esc(fullName(p))||"Unnamed patient"}</div>
-        <div class="rd">${esc((testNames(p).join(", ")||"No tests"))}${p.mrn?" · MRN "+esc(p.mrn):""}</div>
-      </div>
-      <div class="ract">
-        <button data-edit="${i}">Edit</button>
-        <button class="del" data-del="${i}">Delete</button>
-      </div>
-    </div>`).join("");
-  el.querySelectorAll("[data-edit]").forEach(b=> b.onclick=()=>editPatient(+b.dataset.edit));
-  el.querySelectorAll("[data-del]").forEach(b=> b.onclick=()=>deletePatient(+b.dataset.del));
-}
-
-// ---------- Files ----------
-function addFiles(fileList){
-  const p=P();
-  [...fileList].forEach(f=>{
-    if(f.size>15*1024*1024){ alert(`"${f.name}" exceeds 15 MB.`); return; }
-    // Keep the real File object so we can upload the bytes on submit.
-    // (One requisition per patient — replace rather than append.)
-    p.files = [{ name:f.name, size:f.size, blob:f }];
-  });
-  renderFiles();
-}
-function renderFiles(){
-  const list = els[0].querySelector("#fileList");
-  if(!list) return;
-  const p=P();
-  list.innerHTML = p.files.map((f,i)=>`
-    <div class="file-chip">
-      <span>📎</span>
-      <span class="fname">${esc(f.name)}</span>
-      <span class="fsize">${(f.size/1024/1024).toFixed(2)} MB</span>
-      <button data-rm="${i}" aria-label="Remove">×</button>
-    </div>`).join("");
-  list.querySelectorAll("[data-rm]").forEach(b=>{
-    b.onclick=()=>{ p.files.splice(+b.dataset.rm,1); renderFiles(); };
-  });
-}
-
-// ---------- Keyboard ----------
-document.addEventListener("keydown", e=>{
-  const k = seq[idx].key;
-  if(e.key==="Enter" && !e.shiftKey){
-    const tag = document.activeElement.tagName;
-    if(tag==="TEXTAREA") return;
-    if(k==="mode"||k==="gate"||k==="done") return;
-    e.preventDefault();
-    if(k==="review"){ const di=seq.findIndex(s=>s.key==="done"); go(di,"up"); return; }
-    next();
-  }
 });
-document.getElementById("upBtn").onclick = prev;
-document.getElementById("downBtn").onclick = ()=> next();
+document.getElementById("search").addEventListener("input", e=>{
+  filter.q = e.target.value.trim();
+  renderTable();
+});
+
+// Click "Draw date" header to toggle asc/desc
+document.getElementById("dateSortHead").addEventListener("click", ()=>{
+  dateSortDir = dateSortDir==="asc" ? "desc" : "asc";
+  document.getElementById("dateSortArrow").textContent = dateSortDir==="asc" ? "↑" : "↓";
+  renderTable();
+});
+
+// Detail overlay close: X button, click outside, or Escape
+document.getElementById("detailClose").addEventListener("click", closeDetail);
+document.getElementById("detailOverlay").addEventListener("click", e=>{
+  if(e.target.id==="detailOverlay") closeDetail();
+});
+document.addEventListener("keydown", e=>{ if(e.key==="Escape") closeDetail(); });
+document.getElementById("seedBtn").onclick = ()=>{
+  filter={type:"all",status:"all",q:""};
+  document.getElementById("search").value="";
+  document.querySelectorAll("[data-type]").forEach(c=>c.classList.remove("on"));
+  document.querySelector('[data-type="all"]').classList.add("on");
+  load();
+};
 
 // ---------- Boot ----------
-render();
+load();
 </script>
 </body>
 </html>
