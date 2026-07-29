@@ -818,6 +818,12 @@ function signAndReturn(objectPath, res){
   .catch(function(e){ console.error('[SIGN ERROR]', e.message); res.status(500).json({ error:e.message }); });
 }
 
+// Admin can view the tracker (journey-card) layout with full data.
+// Same file clients get; /api/orders already returns all orders for admins.
+app.get('/tracker-view', requireAdmin, function(req, res) {
+  res.sendFile(path.join(__dirname, 'public', 'client.html'));
+});
+
 app.get('/dispatch', requireAdmin, function(req, res) {
   res.sendFile(path.join(__dirname, 'public', 'dispatch.html'));
 });
@@ -923,6 +929,13 @@ app.post('/webhook/ghl', function(req, res) {
   var patient = buildPatient(payload);
   var mrn = patient.mrn;
 
+  // ADDITIVE: also mirror this order into orders+people so the new dashboard
+  // shows it. Wrapped so ANY failure here can never disrupt the live pipeline
+  // below or the 200 returned to GHL. This endpoint = BMC workflow -> org 'bmc'.
+  mirrorToOrders(patient, payload).catch(function(e){
+    console.error('[WEBHOOK->orders MIRROR ERROR — non-fatal]', e.message);
+  });
+
   if (useDB && pool) {
     var mrnCheck = mrn
       ? pool.query('SELECT id, status FROM patients WHERE mrn = $1 LIMIT 1', [mrn])
@@ -962,6 +975,104 @@ app.post('/webhook/ghl', function(req, res) {
     res.status(200).json({ success: true, patientId: patient.id });
   }
 });
+
+// Tracker status words -> orders-table status words.
+var TRACKER_TO_ORDER_STATUS = {
+  received: 'received', scheduled: 'assigned', completed: 'completed',
+  incomplete: 'noshow', unreachable: 'unreach'
+};
+
+// Mirror a GHL order into people + orders. Idempotent: matches an existing
+// person (MRN -> name+phone) and an existing open order before inserting,
+// so repeated GHL fires update rather than duplicate. Never throws to caller.
+function mirrorToOrders(patient, payload) {
+  if (!useDB || !pool) return Promise.resolve();
+
+  var orderStatus = TRACKER_TO_ORDER_STATUS[patient.status] || 'received';
+  var phoneDigits = (patient.phone || '').replace(/\D/g, '');
+  var name = patient.name || ((patient.first_name||'') + ' ' + (patient.last_name||'')).trim();
+
+  // 1) Find the person: MRN first, then name+phone.
+  var findPerson = patient.mrn
+    ? pool.query('SELECT id FROM people WHERE mrn = $1 LIMIT 1', [patient.mrn])
+    : Promise.resolve({ rows: [] });
+
+  return findPerson.then(function(r){
+    if (r.rows.length) return r.rows[0].id;
+    if (name && phoneDigits) {
+      return pool.query(
+        'SELECT id FROM people WHERE lower(full_name)=lower($1) AND phone_digits=$2 LIMIT 1',
+        [name, phoneDigits]
+      ).then(function(r2){ return r2.rows.length ? r2.rows[0].id : null; });
+    }
+    return null;
+  }).then(function(personId){
+    if (personId) {
+      // Enrich any missing person fields without overwriting good data.
+      return pool.query(
+        `UPDATE people SET
+           mrn          = COALESCE(NULLIF(mrn,''), $2),
+           dob          = COALESCE(dob, NULLIF($3,'')::date),
+           phone        = COALESCE(NULLIF(phone,''), $4),
+           phone_digits = COALESCE(NULLIF(phone_digits,''), $5),
+           home_address = COALESCE(NULLIF(home_address,''), $6)
+         WHERE id = $1`,
+        [personId, patient.mrn||null, patient.dob||null, patient.phone||null, phoneDigits||null, patient.address||null]
+      ).then(function(){ return personId; });
+    }
+    // Create the person.
+    var newId = crypto.randomUUID();
+    return pool.query(
+      `INSERT INTO people (id, full_name, first_name, last_name, mrn, dob, phone, phone_digits, home_address, language)
+       VALUES ($1,$2,$3,$4,$5,NULLIF($6,'')::date,$7,$8,$9,'English')`,
+      [newId, name, patient.first_name||'', patient.last_name||'', patient.mrn||null,
+       patient.dob||'', patient.phone||null, phoneDigits||null, patient.address||null]
+    ).then(function(){ return newId; });
+  }).then(function(personId){
+    // 2) Is there already an OPEN order for this person from GHL? Update it
+    //    rather than stacking a new row on every status fire.
+    return pool.query(
+      `SELECT id FROM orders
+        WHERE person_id = $1 AND source = 'ghl_webhook'
+          AND status NOT IN ('completed','lab')
+        ORDER BY received_at DESC LIMIT 1`, [personId]
+    ).then(function(r){
+      if (r.rows.length) {
+        return pool.query(
+          `UPDATE orders SET status=$2, assignee=COALESCE(NULLIF($3,''),assignee),
+                             provider=COALESCE(NULLIF($4,''),provider),
+                             test_type=COALESCE(NULLIF($5,''),test_type),
+                             service_address=COALESCE(NULLIF($6,''),service_address),
+                             updated_at=now()
+             WHERE id=$1`,
+          [r.rows[0].id, orderStatus, patient.assignee||'', patient.provider||'',
+           patient.service||'', patient.address||'']
+        ).then(function(){ console.log('[MIRROR] updated order', r.rows[0].id, '->', orderStatus); });
+      }
+      // 3) New order. Request number = count of this person's orders + 1.
+      return pool.query('SELECT COUNT(*)::int AS n FROM orders WHERE person_id=$1',[personId])
+        .then(function(c){
+          var reqNo = (c.rows[0].n || 0) + 1;
+          var oid = crypto.randomUUID();
+          var testsArr = patient.service ? [patient.service] : [];
+          return pool.query(
+            `INSERT INTO orders
+               (id, person_id, request_no, source, org_id, status, requested_date,
+                provider, test_type, tests, service_address, access_notes,
+                assignee, notify_email, received_at, billing_ready, missing_fields, payload)
+             VALUES ($1,$2,$3,'ghl_webhook','bmc',$4,NULL,
+                $5,$6,$7::jsonb,$8,$9,$10,$11,now(),false,ARRAY['service_address','test_type']::text[],$12::jsonb)`,
+            [oid, personId, reqNo, orderStatus,
+             patient.provider||null, patient.service||null,
+             JSON.stringify(testsArr),
+             patient.address||null, patient.notes||null,
+             patient.assignee||null, patient.email||null,
+             JSON.stringify(payload)]
+          ).then(function(){ console.log('[MIRROR] inserted order', oid, 'req', reqNo, 'person', personId); });
+        });
+    });
+  });
+}
 
 app.get('/webhook/test', function(req, res) {
   var testPayload = {
