@@ -20,6 +20,9 @@ var PORT = process.env.PORT || 3000;
 var DB_URL            = process.env.DATABASE_URL || '';
 var SUPABASE_URL         = process.env.SUPABASE_URL || 'https://hnamuztnddupqasikrfi.supabase.co';
 var SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || '';
+// GHL inbound webhook that fires the BMC workflow (notifications/calendar/assignment).
+// Set in Railway env — never hardcode the trigger URL in a browser file.
+var GHL_INBOUND_URL      = process.env.GHL_INBOUND_URL || '';
 var SESSION_SECRET    = process.env.SESSION_SECRET || 'bmh-session-secret-2026';
 var ADMIN_PASSWORD    = process.env.ADMIN_PASSWORD || 'bmh-admin-2026';
 var ADMIN_EMAIL       = process.env.ADMIN_EMAIL    || 'admin@beyondmobilehealth.com';
@@ -38,6 +41,7 @@ var resetTokens = {};
 
 console.log('[ENV] DATABASE_URL present:', !!DB_URL);
 console.log('[ENV] SUPABASE_SERVICE_KEY present:', !!SUPABASE_SERVICE_KEY);
+console.log('[ENV] GHL_INBOUND_URL present:', !!GHL_INBOUND_URL);
 console.log('[ENV] AZURE configured:', !!AZURE_TENANT_ID && !!AZURE_CLIENT_ID);
 console.log('[ENV] ADMIN_PASSWORD length:', ADMIN_PASSWORD.length, '| first char:', ADMIN_PASSWORD[0]);
 console.log('[ENV] SMTP configured:', !!SMTP_HOST && !!SMTP_USER);
@@ -822,6 +826,70 @@ function signAndReturn(objectPath, res){
 // Same file clients get; /api/orders already returns all orders for admins.
 app.get('/tracker-view', requireAdmin, function(req, res) {
   res.sendFile(path.join(__dirname, 'public', 'client.html'));
+});
+
+// ---------------------------------------------------------------------------
+// Intake -> GHL bridge. The public intake form calls this AFTER it has written
+// the order to Supabase. Railway reads the order back from the DB (so the
+// browser can't forge fields), then POSTs clean data to the GHL inbound
+// webhook, which fires the BMC workflow for notifications/calendar/assignment.
+// The GHL trigger URL lives only here (server-side), never in the browser.
+// This route is intentionally UNauthenticated (the public form calls it) but
+// it only accepts an order id and reveals nothing — it reads server-side.
+// ---------------------------------------------------------------------------
+app.post('/api/intake-submitted', function(req, res){
+  var orderId = (req.body && req.body.orderId) ? String(req.body.orderId) : '';
+  if(!orderId) return res.status(400).json({ ok:false, error:'orderId required' });
+  if(!GHL_INBOUND_URL){ console.warn('[INTAKE->GHL] no GHL_INBOUND_URL set; skipping push'); return res.json({ ok:true, pushed:false, reason:'not_configured' }); }
+  if(!useDB || !pool) return res.json({ ok:true, pushed:false, reason:'no_db' });
+
+  // Read the order + person from the DB — source of truth, not the browser.
+  pool.query(
+    `SELECT o.id, o.status, o.requested_date, o.provider, o.test_type, o.service_address,
+            o.access_notes, o.best_time, o.notify_email, o.org_id,
+            p.full_name, p.first_name, p.last_name, p.mrn, p.dob, p.phone
+       FROM orders o JOIN people p ON p.id = o.person_id
+      WHERE o.id = $1 LIMIT 1`, [orderId]
+  ).then(function(r){
+    if(!r.rows.length) return res.status(404).json({ ok:false, error:'order not found' });
+    var o = r.rows[0];
+
+    // Payload for the GHL inbound webhook. Field names match what the BMC
+    // workflow already maps (buildPatient handles these keys).
+    var ghlBody = {
+      source: 'bmh_intake',
+      order_id: o.id,
+      org_id: o.org_id || 'bmc',
+      first_name: o.first_name || '',
+      last_name: o.last_name || '',
+      full_name: o.full_name || '',
+      phone: o.phone || '',
+      email: o.notify_email || '',
+      date_of_birth: o.dob ? String(o.dob).slice(0,10) : '',
+      mrn: o.mrn || '',
+      address: o.service_address || '',
+      test_type: o.test_type || '',
+      provider: o.provider || '',
+      access_notes: o.access_notes || '',
+      best_time: o.best_time || '',
+      requested_date: o.requested_date ? String(o.requested_date).slice(0,10) : '',
+      status: o.status || 'received'
+    };
+
+    return fetch(GHL_INBOUND_URL, {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify(ghlBody)
+    }).then(function(g){
+      console.log('[INTAKE->GHL] pushed order', o.id, 'status', g.status);
+      res.json({ ok:true, pushed:true, ghlStatus:g.status });
+    });
+  }).catch(function(e){
+    // Non-fatal: the order is already safely in the tracker. GHL push failing
+    // must not error the form. Log and return ok so the client isn't blocked.
+    console.error('[INTAKE->GHL ERROR — non-fatal]', e.message);
+    res.json({ ok:true, pushed:false, error:e.message });
+  });
 });
 
 app.get('/dispatch', requireAdmin, function(req, res) {
