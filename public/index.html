@@ -383,6 +383,7 @@
 // ---------- Supabase (browser client via REST) ----------
 const SB_URL = "https://hnamuztnddupqasikrfi.supabase.co";
 const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhuYW11enRuZGR1cHFhc2lrcmZpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxODY5MjcsImV4cCI6MjA5MDc2MjkyN30.Y2fWzyzMv1HJcjaBx6dvzhdhkOkZSo6eakif4T2I-1M";
+const RAILWAY_URL = "https://bmh-tracker-production.up.railway.app";
 
 function newOrderId(){
   const d = new Date();
@@ -520,6 +521,7 @@ function buildOrders(p, personId, startingRequestNo){
   const base = {
     person_id: personId,
     source: "web_intake",
+    org_id: "bmc",
     status: "received",
     test_type: testNames(p).join(", "),
     tests: testNames(p),
@@ -634,6 +636,21 @@ async function submitToSupabase(){
         } catch(upErr){
           console.error("requisition upload error", upErr);
           // Non-fatal: the order is saved; the file just didn't attach.
+        }
+      }
+
+      // Fire the GHL workflow (notifications / calendar / assignment) via
+      // Railway — server-side, so the GHL trigger URL stays private. The order
+      // is already safely in the tracker; this push is best-effort.
+      if(saved.length){
+        try {
+          await fetch(`${RAILWAY_URL}/api/intake-submitted`, {
+            method:"POST",
+            headers:{ "Content-Type":"application/json" },
+            body: JSON.stringify({ orderId: saved[0].id })
+          });
+        } catch(ghlErr){
+          console.error("GHL bridge call failed (non-fatal)", ghlErr);
         }
       }
 
