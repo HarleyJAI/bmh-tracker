@@ -930,7 +930,7 @@ app.post('/api/intake-submitted', function(req, res){
       headers:{ 'Content-Type':'application/json' },
       body: JSON.stringify(ghlBody)
     }).then(function(g){
-      console.log('[INTAKE->GHL] pushed order', o.id, 'status', g.status);
+      console.log('[INTAKE->GHL] pushed order', o.id, 'status', g.status, '| requisition_url:', reqUrl || '(none)');
       res.json({ ok:true, pushed:true, ghlStatus:g.status });
     });
   }).catch(function(e){
