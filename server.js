@@ -801,13 +801,22 @@ app.get('/r/:orderId/:token', function(req, res){
     .then(function(r){
       if(!r.rows.length || !r.rows[0].requisition_path) return res.status(404).send('No requisition on file.');
       var objectPath = r.rows[0].requisition_path;
-      return fetch(SUPABASE_URL + '/storage/v1/object/sign/requisitions/' + encodeURI(objectPath), {
+      // Encode each path segment but keep the slash separators intact —
+      // Supabase's sign endpoint needs real slashes in the path.
+      var safePath = String(objectPath).split('/').map(encodeURIComponent).join('/');
+      return fetch(SUPABASE_URL + '/storage/v1/object/sign/requisitions/' + safePath, {
         method:'POST',
         headers:{ 'Authorization':'Bearer ' + SUPABASE_SERVICE_KEY, 'Content-Type':'application/json' },
         body: JSON.stringify({ expiresIn: 1800 })  // 30 min — phlebotomist prints in the field
-      }).then(function(s){ return s.json().then(function(j){ return { ok:s.ok, j:j }; }); })
+      }).then(function(s){ return s.text().then(function(t){
+          var j; try{ j=JSON.parse(t); }catch(e){ j={}; }
+          return { ok:s.ok, status:s.status, j:j, raw:t };
+        }); })
         .then(function(o){
-          if(!o.ok || !o.j.signedURL) return res.status(502).send('Could not open requisition.');
+          if(!o.ok || !o.j.signedURL){
+            console.error('[/r SIGN FAIL]', o.status, o.raw);
+            return res.status(502).send('Could not open requisition.');
+          }
           res.redirect(SUPABASE_URL + '/storage/v1' + o.j.signedURL);
         });
     })
@@ -848,7 +857,8 @@ app.get('/api/requisition/:orderId', requireAuth, function(req, res){
 
 function signAndReturn(objectPath, res){
   // Supabase Storage: create a signed URL valid for 5 minutes.
-  return fetch(SUPABASE_URL + '/storage/v1/object/sign/requisitions/' + encodeURI(objectPath), {
+  var safePath = String(objectPath).split('/').map(encodeURIComponent).join('/');
+  return fetch(SUPABASE_URL + '/storage/v1/object/sign/requisitions/' + safePath, {
     method:'POST',
     headers:{ 'Authorization':'Bearer ' + SUPABASE_SERVICE_KEY, 'Content-Type':'application/json' },
     body: JSON.stringify({ expiresIn: 300 })
