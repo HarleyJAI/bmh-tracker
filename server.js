@@ -23,6 +23,10 @@ var SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || '';
 // GHL inbound webhook that fires the BMC workflow (notifications/calendar/assignment).
 // Set in Railway env — never hardcode the trigger URL in a browser file.
 var GHL_INBOUND_URL      = process.env.GHL_INBOUND_URL || '';
+// Public base URL for building phlebotomist-facing requisition links in GHL.
+var PUBLIC_BASE_URL      = process.env.PUBLIC_BASE_URL || 'https://bmh-tracker-production.up.railway.app';
+// Secret for tokenizing requisition links (falls back to session secret).
+var REQ_LINK_SECRET      = process.env.REQ_LINK_SECRET || process.env.SESSION_SECRET || 'bmh-req-link-fallback';
 var SESSION_SECRET    = process.env.SESSION_SECRET || 'bmh-session-secret-2026';
 var ADMIN_PASSWORD    = process.env.ADMIN_PASSWORD || 'bmh-admin-2026';
 var ADMIN_EMAIL       = process.env.ADMIN_EMAIL    || 'admin@beyondmobilehealth.com';
@@ -775,6 +779,41 @@ app.get('/api/orders', requireAuth, function(req, res) {
 // ---------------------------------------------------------------------------
 // Dispatch dashboard (admin only). Full org-tagged operational view.
 // ---------------------------------------------------------------------------
+// Tokenize a requisition link: HMAC(order_id, secret). Unguessable without the
+// secret, stable per order, needs no login — for phlebotomists working in GHL.
+function reqToken(orderId){
+  return crypto.createHmac('sha256', REQ_LINK_SECRET)
+    .update(String(orderId)).digest('hex').slice(0, 32);
+}
+
+// PUBLIC requisition link (no login) used inside GHL by phlebotomists.
+// The token gates access; on valid token we mint a fresh 5-min signed URL
+// and redirect to the actual PDF. The file itself stays in the private bucket.
+app.get('/r/:orderId/:token', function(req, res){
+  var orderId = req.params.orderId;
+  var token   = req.params.token;
+  if (token !== reqToken(orderId)) {
+    return res.status(403).send('Invalid or expired requisition link.');
+  }
+  if(!useDB || !pool || !SUPABASE_SERVICE_KEY) return res.status(503).send('Unavailable.');
+
+  pool.query('SELECT requisition_path FROM orders WHERE id = $1', [orderId])
+    .then(function(r){
+      if(!r.rows.length || !r.rows[0].requisition_path) return res.status(404).send('No requisition on file.');
+      var objectPath = r.rows[0].requisition_path;
+      return fetch(SUPABASE_URL + '/storage/v1/object/sign/requisitions/' + encodeURI(objectPath), {
+        method:'POST',
+        headers:{ 'Authorization':'Bearer ' + SUPABASE_SERVICE_KEY, 'Content-Type':'application/json' },
+        body: JSON.stringify({ expiresIn: 1800 })  // 30 min — phlebotomist prints in the field
+      }).then(function(s){ return s.json().then(function(j){ return { ok:s.ok, j:j }; }); })
+        .then(function(o){
+          if(!o.ok || !o.j.signedURL) return res.status(502).send('Could not open requisition.');
+          res.redirect(SUPABASE_URL + '/storage/v1' + o.j.signedURL);
+        });
+    })
+    .catch(function(e){ console.error('[/r ERROR]', e.message); res.status(500).send('Error opening requisition.'); });
+});
+
 // ---------------------------------------------------------------------------
 // Requisition retrieval — brokered server-side so the private file is never
 // exposed via a browser key. Staff/admin get any; a client is org-scoped to
@@ -846,13 +885,22 @@ app.post('/api/intake-submitted', function(req, res){
   // Read the order + person from the DB — source of truth, not the browser.
   pool.query(
     `SELECT o.id, o.status, o.requested_date, o.provider, o.test_type, o.service_address,
-            o.access_notes, o.best_time, o.notify_email, o.org_id,
+            o.access_notes, o.best_time, o.notify_email, o.org_id, o.requisition_path,
             p.full_name, p.first_name, p.last_name, p.mrn, p.dob, p.phone
        FROM orders o JOIN people p ON p.id = o.person_id
       WHERE o.id = $1 LIMIT 1`, [orderId]
   ).then(function(r){
     if(!r.rows.length) return res.status(404).json({ ok:false, error:'order not found' });
     var o = r.rows[0];
+
+    // Requisition link for GHL (phlebotomists work out of GHL). Tokenized so it
+    // needs no login but is unguessable; /r/:token redirects to a fresh signed
+    // URL. Only orders that actually have a file get a link.
+    var reqUrl = '';
+    if (o.requisition_path) {
+      var tok = reqToken(o.id);
+      reqUrl = PUBLIC_BASE_URL + '/r/' + o.id + '/' + tok;
+    }
 
     // Payload for the GHL inbound webhook. Field names match what the BMC
     // workflow already maps (buildPatient handles these keys).
@@ -873,7 +921,8 @@ app.post('/api/intake-submitted', function(req, res){
       access_notes: o.access_notes || '',
       best_time: o.best_time || '',
       requested_date: o.requested_date ? String(o.requested_date).slice(0,10) : '',
-      status: o.status || 'received'
+      status: o.status || 'received',
+      requisition_url: reqUrl
     };
 
     return fetch(GHL_INBOUND_URL, {
