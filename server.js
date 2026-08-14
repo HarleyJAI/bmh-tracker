@@ -1221,6 +1221,180 @@ app.get('/webhook/test', function(req, res) {
   }
 });
 
+
+// ---------------------------------------------------------------------------
+// DRAW EXCEPTION EVENTS
+// Logs hard sticks, short draws, no-shows, unreachable, refused into
+// order_events (append-only). Statuses stay within the existing vocabulary:
+// no_show -> 'noshow', patient_unreachable -> 'unreach'. Hard sticks do NOT
+// change order status; they surface via open events (Exceptions lane).
+// Auth: admin session OR a valid requisition token (so phlebotomists can
+// report from the /r page without logging in).
+// Notify: optional GHL_EXCEPTION_URL webhook (separate from GHL_INBOUND_URL
+// so exception pings never fire the BMC intake workflow). Skip-not-fail.
+// ---------------------------------------------------------------------------
+var EXCEPTION_TYPES = ['hard_stick', 'short_draw', 'patient_unreachable', 'no_show', 'refused'];
+var MAX_STICKS = 2; // BMC protocol: two-stick max, then reassign
+var GHL_EXCEPTION_URL = process.env.GHL_EXCEPTION_URL || '';
+
+var EXCEPTION_TO_ORDER_STATUS = {
+  no_show:             'noshow',
+  patient_unreachable: 'unreach'
+  // hard_stick / short_draw / refused: leave status untouched
+};
+
+function notifyExceptionGHL(order, eventType, meta) {
+  if (!GHL_EXCEPTION_URL) {
+    console.log('[EXCEPTION->GHL] no GHL_EXCEPTION_URL set; skipping notify');
+    return Promise.resolve();
+  }
+  return fetch(GHL_EXCEPTION_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      source:        'bmh_exception',
+      order_id:      order.id,
+      org_id:        order.org_id || 'bmc',
+      full_name:     order.full_name || '',
+      mrn:           order.mrn || '',
+      event_type:    eventType,
+      stick_count:   meta.stick_count || '',
+      return_window: meta.return_visit_scheduled || '',
+      reassign:      meta.reassign_requested ? 'yes' : 'no',
+      note:          meta.note || ''
+    })
+  }).then(function(g) {
+    console.log('[EXCEPTION->GHL] pushed', order.id, eventType, 'status', g.status);
+  }).catch(function(e) {
+    console.error('[EXCEPTION->GHL ERROR — non-fatal]', e.message);
+  });
+}
+
+function logExceptionAudit(req, orderId, action, actor) {
+  if (!useDB || !pool) return;
+  pool.query(
+    'INSERT INTO access_log (id,email,name,role,action,record_id,logged_in_at,ip) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)',
+    [crypto.randomUUID(),
+     actor.email || 'field', actor.name || 'Field Report', actor.role || 'phleb',
+     action, orderId, new Date().toISOString(),
+     req.headers['x-forwarded-for'] || req.ip]
+  ).catch(function(e) { console.log('[EXCEPTION AUDIT]', e.message); });
+}
+
+// POST /api/exceptions
+// Body: { orderId, token?, eventType, note?, stickCount?, returnVisitScheduled?, reassignRequested?, reportedBy? }
+// token = reqToken(orderId) — required unless the caller has an admin session.
+app.post('/api/exceptions', function(req, res) {
+  var b = req.body || {};
+  var orderId   = b.orderId ? String(b.orderId) : '';
+  var eventType = b.eventType ? String(b.eventType) : '';
+
+  if (!orderId || !eventType) return res.status(400).json({ ok: false, error: 'orderId and eventType required' });
+  if (EXCEPTION_TYPES.indexOf(eventType) === -1) {
+    return res.status(400).json({ ok: false, error: 'eventType must be one of: ' + EXCEPTION_TYPES.join(', ') });
+  }
+
+  var isAdmin  = req.session && req.session.role === 'admin';
+  var tokenOk  = b.token && b.token === reqToken(orderId);
+  if (!isAdmin && !tokenOk) return res.status(403).json({ ok: false, error: 'Not authorized' });
+
+  var stickCount = b.stickCount != null ? parseInt(b.stickCount, 10) : null;
+  if (stickCount != null && (isNaN(stickCount) || stickCount < 1 || stickCount > MAX_STICKS)) {
+    return res.status(400).json({ ok: false, error: 'stickCount must be 1-' + MAX_STICKS });
+  }
+
+  if (!useDB || !pool) return res.status(503).json({ ok: false, error: 'No database' });
+
+  pool.query(
+    'SELECT o.id, o.org_id, o.status, p.full_name, p.mrn FROM orders o JOIN people p ON p.id = o.person_id WHERE o.id = $1 LIMIT 1',
+    [orderId]
+  ).then(function(r) {
+    if (!r.rows.length) return res.status(404).json({ ok: false, error: 'Order not found' });
+    var order = r.rows[0];
+
+    var meta = {};
+    if (stickCount != null)          meta.stick_count = stickCount;
+    if (b.returnVisitScheduled)      meta.return_visit_scheduled = String(b.returnVisitScheduled);
+    if (b.reassignRequested != null) meta.reassign_requested = !!b.reassignRequested;
+    if (eventType === 'hard_stick' && stickCount >= MAX_STICKS) meta.reassign_requested = true;
+    meta.note = b.note ? String(b.note) : '';
+
+    var createdBy = isAdmin
+      ? ((req.session.user && req.session.user.email) || 'admin')
+      : (b.reportedBy ? String(b.reportedBy) : 'phlebotomist-field');
+
+    var eventId = crypto.randomUUID();
+    return pool.query(
+      'INSERT INTO order_events (id, order_id, org_id, event_type, note, metadata, created_by) VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7)',
+      [eventId, order.id, order.org_id || 'bmc', eventType, meta.note || null, JSON.stringify(meta), createdBy]
+    ).then(function() {
+      // Status transition ONLY within existing vocabulary.
+      var newStatus = EXCEPTION_TO_ORDER_STATUS[eventType];
+      var statusStep = newStatus && order.status !== newStatus && order.status !== 'completed' && order.status !== 'lab'
+        ? pool.query('UPDATE orders SET status = $2, updated_at = now() WHERE id = $1', [order.id, newStatus])
+        : Promise.resolve();
+
+      return statusStep.then(function() {
+        logExceptionAudit(req, order.id, 'exception:' + eventType,
+          isAdmin ? { email: req.session.user && req.session.user.email, name: req.session.user && req.session.user.name, role: 'admin' }
+                  : { email: createdBy, name: createdBy, role: 'phleb' });
+
+        // Notify — non-blocking, never fails the request.
+        notifyExceptionGHL(order, eventType, meta);
+
+        res.status(201).json({
+          ok: true,
+          eventId: eventId,
+          orderStatus: newStatus || order.status,
+          reassignFlagged: !!meta.reassign_requested
+        });
+      });
+    });
+  }).catch(function(err) {
+    console.error('[POST /api/exceptions ERROR]', err.message);
+    res.status(500).json({ ok: false, error: err.message });
+  });
+});
+
+// PATCH /api/exceptions/:eventId/resolve  (admin only — dispatcher action)
+app.patch('/api/exceptions/:eventId/resolve', requireAdmin, function(req, res) {
+  var eventId = req.params.eventId;
+  var note    = (req.body && req.body.resolutionNote) ? String(req.body.resolutionNote) : null;
+  if (!useDB || !pool) return res.status(503).json({ ok: false, error: 'No database' });
+
+  pool.query(
+    "UPDATE order_events SET resolved = true, resolved_at = now(), metadata = metadata || jsonb_build_object('resolution_note', $2::text) WHERE id = $1 AND resolved = false RETURNING order_id",
+    [eventId, note]
+  ).then(function(r) {
+    if (!r.rows.length) return res.status(404).json({ ok: false, error: 'Event not found or already resolved' });
+    logExceptionAudit(req, r.rows[0].order_id, 'exception:resolved',
+      { email: req.session.user && req.session.user.email, name: req.session.user && req.session.user.name, role: 'admin' });
+    res.json({ ok: true, resolved: eventId });
+  }).catch(function(err) {
+    console.error('[PATCH /api/exceptions resolve ERROR]', err.message);
+    res.status(500).json({ ok: false, error: err.message });
+  });
+});
+
+// GET /api/exceptions/open  (admin only — feeds the Exceptions kanban lane)
+app.get('/api/exceptions/open', requireAdmin, function(req, res) {
+  if (!useDB || !pool) return res.json([]);
+  pool.query(
+    'SELECT v.order_id, v.org_id, v.open_event_count, v.latest_event_at, v.latest_event_type, v.max_stick_count, ' +
+    '       o.status, o.assignee, o.requested_date, p.full_name, p.mrn, p.phone ' +
+    '  FROM v_open_exceptions v ' +
+    '  JOIN orders o ON o.id = v.order_id ' +
+    '  JOIN people p ON p.id = o.person_id ' +
+    ' ORDER BY v.latest_event_at DESC LIMIT 500'
+  ).then(function(r) {
+    res.json(r.rows);
+  }).catch(function(err) {
+    console.error('[GET /api/exceptions/open ERROR]', err.message);
+    res.status(500).json({ ok: false, error: err.message });
+  });
+});
+// --------------------------- END DRAW EXCEPTIONS ---------------------------
+
 // ---------------------------------------------------------------------------
 // Static files
 // ---------------------------------------------------------------------------
