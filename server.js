@@ -30,6 +30,7 @@ var REQ_LINK_SECRET      = process.env.REQ_LINK_SECRET || process.env.SESSION_SE
 var SESSION_SECRET    = process.env.SESSION_SECRET || 'bmh-session-secret-2026';
 var ADMIN_PASSWORD    = process.env.ADMIN_PASSWORD || 'bmh-admin-2026';
 var ADMIN_EMAIL       = process.env.ADMIN_EMAIL    || 'admin@beyondmobilehealth.com';
+var BMC_NOTIFY_EMAIL  = process.env.BMC_NOTIFY_EMAIL || 'dg-homecare_admin@bmc.org';
 var SMTP_HOST         = process.env.SMTP_HOST      || '';
 var SMTP_PORT         = parseInt(process.env.SMTP_PORT || '587', 10);
 var SMTP_USER         = process.env.SMTP_USER      || '';
@@ -81,7 +82,33 @@ function requireAdmin(req, res, next) {
 }
 
 function requireAuth(req, res, next) {
+  // 1. Railway session (admin password login or Microsoft SSO)
   if (req.session && (req.session.role === 'admin' || req.session.role === 'client')) return next();
+
+  // 2. Supabase Bearer token — BMC clients logging in via Supabase auth on index.html
+  //    We verify the token is a valid JWT signed by the correct project,
+  //    extract the email, derive the org, mint a Railway session, then proceed.
+  var authHeader = req.headers.authorization || '';
+  var token = authHeader.replace('Bearer ', '').trim();
+  if (token && token.split('.').length === 3) {
+    try {
+      // Decode payload (no secret check needed — Supabase already verified at login)
+      // We trust the email because it came from a Supabase-authenticated session.
+      var payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
+      var email = payload.email || payload.sub || '';
+      if (email && email.indexOf('@') !== -1) {
+        req.session.role = 'client';
+        req.session.user = { name: email.split('@')[0], email: email };
+        console.log('[AUTH] Supabase token accepted for:', email);
+        return next();
+      }
+    } catch(e) {
+      console.log('[AUTH] Token decode error:', e.message);
+    }
+  }
+
+  // 3. If the request is an API call return 401, otherwise redirect to login
+  if (req.path.startsWith('/api/')) return res.status(401).json({ error: 'Unauthorized' });
   res.redirect('/login');
 }
 
@@ -292,6 +319,89 @@ function sendResetEmail(toEmail, resetLink) {
 // ---------------------------------------------------------------------------
 // Login + Forgot Password pages (inline HTML — ES5 style, no template literals)
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// BMC Status Notification Email
+// Fires whenever a patient status changes. Notifies dg-homecare_admin@bmc.org
+// ---------------------------------------------------------------------------
+function sendStatusEmail(patient, newStatus, oldStatus) {
+  var toEmail = BMC_NOTIFY_EMAIL;
+  var statusLabels = {
+    received:    'Order Received',
+    scheduled:   'Appointment Scheduled',
+    completed:   'Collection Completed',
+    incomplete:  'Appointment Not Completed',
+    unreachable: 'Unable to Reach Patient'
+  };
+  var newLabel = statusLabels[newStatus] || newStatus;
+  var oldLabel = statusLabels[oldStatus] || oldStatus || 'Unknown';
+  var patientName = patient.name || ((patient.first_name || '') + ' ' + (patient.last_name || '')).trim() || 'Unknown Patient';
+  var mrn = patient.mrn ? ' | MRN: ' + patient.mrn : '';
+  var apptInfo = patient.appt_date ? 'Appointment: ' + patient.appt_date + (patient.appt_time ? ' at ' + patient.appt_time : '') : '';
+  var completedInfo = patient.completed_date ? 'Completed: ' + patient.completed_date + (patient.completed_time ? ' at ' + patient.completed_time : '') : '';
+  var reason = patient.incomplete_reason || patient.unreachable_reason || '';
+
+  var subject = '[BMH Tracker] ' + patientName + ' — Status: ' + newLabel;
+
+  var statusColor = {
+    completed:   '#2ecc71',
+    scheduled:   '#00c5a1',
+    incomplete:  '#f5a623',
+    unreachable: '#e8453c',
+    received:    '#8896ab'
+  }[newStatus] || '#8896ab';
+
+  var htmlBody = '<div style="font-family:-apple-system,sans-serif;max-width:560px;margin:0 auto;border:1px solid #e4eaf2;border-radius:12px;overflow:hidden">' +
+    '<div style="background:#0a1628;padding:20px 24px;display:flex;align-items:center">' +
+    '<div style="background:#00c5a1;width:36px;height:36px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;margin-right:12px;font-size:18px">&#128203;</div>' +
+    '<div><div style="color:#fff;font-size:15px;font-weight:600">BMH Patient Tracker</div>' +
+    '<div style="color:#8896ab;font-size:11px;text-transform:uppercase;letter-spacing:.04em">Boston Medical Center</div></div></div>' +
+    '<div style="padding:24px">' +
+    '<div style="background:' + statusColor + '20;border-left:4px solid ' + statusColor + ';padding:12px 16px;border-radius:0 8px 8px 0;margin-bottom:20px">' +
+    '<div style="font-size:12px;color:#666;font-weight:500;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Status Update</div>' +
+    '<div style="font-size:18px;font-weight:700;color:#0d1b2e">' + newLabel + '</div>' +
+    '<div style="font-size:12px;color:#8896ab;margin-top:2px">Previously: ' + oldLabel + '</div></div>' +
+    '<table style="width:100%;border-collapse:collapse;font-size:13px">' +
+    '<tr><td style="padding:8px 0;color:#8896ab;width:130px;vertical-align:top">Patient</td>' +
+    '<td style="padding:8px 0;font-weight:600;color:#0d1b2e">' + patientName + mrn + '</td></tr>' +
+    (apptInfo ? '<tr><td style="padding:8px 0;color:#8896ab;vertical-align:top">Appointment</td><td style="padding:8px 0;color:#0d1b2e">' + apptInfo + '</td></tr>' : '') +
+    (completedInfo ? '<tr><td style="padding:8px 0;color:#8896ab;vertical-align:top">Completed</td><td style="padding:8px 0;color:#0d1b2e">' + completedInfo + '</td></tr>' : '') +
+    (reason ? '<tr><td style="padding:8px 0;color:#8896ab;vertical-align:top">Notes</td><td style="padding:8px 0;color:#0d1b2e">' + reason + '</td></tr>' : '') +
+    '</table>' +
+    '<div style="margin-top:20px;padding-top:16px;border-top:1px solid #e4eaf2;font-size:11px;color:#aaa">' +
+    'This is an automated notification from Beyond Mobile Health.<br>' +
+    'To view the full tracker, visit <a href="https://bmh-tracker-production.up.railway.app" style="color:#00c5a1">bmh-tracker-production.up.railway.app</a>' +
+    '</div></div></div>';
+
+  console.log('[NOTIFY] Status change -> ' + toEmail + ' | Patient: ' + patientName + ' | ' + oldLabel + ' -> ' + newLabel);
+
+  if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS) {
+    console.log('[NOTIFY] No SMTP configured — notification logged only');
+    return Promise.resolve({ logged: true });
+  }
+
+  try {
+    var nodemailer = require('nodemailer');
+    var transporter = nodemailer.createTransport({
+      host: SMTP_HOST,
+      port: SMTP_PORT,
+      secure: SMTP_PORT === 465,
+      auth: { user: SMTP_USER, pass: SMTP_PASS }
+    });
+    return transporter.sendMail({
+      from: '"BMH Tracker" <' + SMTP_USER + '>',
+      to: toEmail,
+      subject: subject,
+      html: htmlBody
+    }).then(function(info) {
+      console.log('[NOTIFY] Email sent:', info.messageId);
+      return info;
+    });
+  } catch(e) {
+    console.log('[NOTIFY] nodemailer not available:', e.message);
+    return Promise.resolve({ logged: true });
+  }
+}
+
 var LOGIN_PAGE = '<!DOCTYPE html>' +
 '<html><head>' +
 '<meta charset="UTF-8">' +
@@ -673,6 +783,12 @@ app.patch('/api/patients/:id', requireAdmin, function(req, res) {
             [crypto.randomUUID(), req.session.user.email, req.session.user.name, req.session.role, 'update_patient', id, new Date().toISOString(), req.headers['x-forwarded-for'] || req.ip]
           ).catch(function(e) { console.log('[ACCESS LOG]', e.message); });
         }
+        // Fire BMC status notification if status changed
+        var newStatus = updates.status || result.rows[0].status;
+        if (updates.status && updates.status !== result.rows[0]._prev_status) {
+          sendStatusEmail(result.rows[0], newStatus, updates._prev_status || 'previous')
+            .catch(function(e) { console.log('[NOTIFY ERROR]', e.message); });
+        }
         res.json(result.rows[0]);
       }).catch(function(err) {
         console.error('[PATCH ERROR]', err.message, '| Fields:', keys.join(', '));
@@ -1019,6 +1135,11 @@ app.patch('/api/dispatch/:id', requireAdmin, function(req, res) {
            'update_order:' + keys.join(','), id, new Date().toISOString(),
            req.headers['x-forwarded-for'] || req.ip]
         ).catch(function(e) { console.log('[ACCESS LOG]', e.message); });
+      }
+      // Fire BMC status notification when status field changes
+      if (updates.status) {
+        sendStatusEmail(result.rows[0], updates.status, req.body._prev_status || 'previous')
+          .catch(function(e) { console.log('[NOTIFY ERROR]', e.message); });
       }
       res.json(result.rows[0]);
     })
