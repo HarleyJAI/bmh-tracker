@@ -31,6 +31,7 @@ var SESSION_SECRET    = process.env.SESSION_SECRET || 'bmh-session-secret-2026';
 var ADMIN_PASSWORD    = process.env.ADMIN_PASSWORD || 'bmh-admin-2026';
 var ADMIN_EMAIL       = process.env.ADMIN_EMAIL    || 'admin@beyondmobilehealth.com';
 var BMC_NOTIFY_EMAIL  = process.env.BMC_NOTIFY_EMAIL || 'dg-homecare_admin@bmc.org';
+var NURSE_DG_EMAIL    = process.env.NURSE_DG_EMAIL   || '';
 var SMTP_HOST         = process.env.SMTP_HOST      || '';
 var SMTP_PORT         = parseInt(process.env.SMTP_PORT || '587', 10);
 var SMTP_USER         = process.env.SMTP_USER      || '';
@@ -194,23 +195,32 @@ function extractField(obj, keys) {
 function normalizeStatus(status) {
   if (!status) return 'received';
   var v = String(status).trim().toLowerCase();
-  if (v === 'showed')                           return 'completed';
-  if (v === 'no_show' || v === 'no show')       return 'incomplete';
-  if (v === 'confirmed')                        return 'scheduled';
-  if (v === 'unconfirmed')                      return 'received';
-  if (v === 'cancelled' || v === 'invalid')     return 'incomplete';
-  if (v === 'completed')                        return 'completed';
-  if (v === 'not completed')                    return 'incomplete';
-  if (v === 'unable to reach')                  return 'unreachable';
-  if (v === 'appt scheduled')                   return 'scheduled';
-  if (v === 'order received')                   return 'received';
-  if (v.indexOf('complet')  !== -1)             return 'completed';
-  if (v.indexOf('schedule') !== -1)             return 'scheduled';
-  if (v.indexOf('reach')    !== -1)             return 'unreachable';
+  // Completed / showed
+  if (v === 'showed')                                    return 'completed';
+  if (v === 'completed' || v.indexOf('complet') !== -1)  return 'completed';
+  // No show / incomplete
+  if (v === 'no_show' || v === 'no show')                return 'incomplete';
+  if (v === 'not completed')                             return 'incomplete';
+  if (v === 'cancelled' || v === 'invalid')              return 'incomplete';
+  // Confirmed / appointment scheduled — GHL sends 'confirmed'
+  if (v === 'confirmed')                                 return 'scheduled';
+  if (v === 'appt scheduled')                            return 'scheduled';
+  if (v.indexOf('schedule') !== -1)                      return 'scheduled';
+  // Calling / scheduling in progress — GHL sends 'unconfirmed' or 'new'
+  if (v === 'unconfirmed' || v === 'new')                return 'calling';
+  if (v === 'calling' || v.indexOf('calling') !== -1)    return 'calling';
+  if (v.indexOf('scheduling') !== -1)                    return 'calling';
+  // Unable to reach
+  if (v === 'unable to reach')                           return 'unreachable';
+  if (v.indexOf('reach') !== -1)                         return 'unreachable';
+  // Order received (default)
+  if (v === 'order received')                            return 'received';
   return 'received';
 }
 
-var STATUS_RANK = { received: 1, scheduled: 2, incomplete: 2, unreachable: 2, completed: 3 };
+// Status rank — higher rank wins when merging duplicate MRNs
+// calling=2 so confirmed(3) beats calling but calling beats received(1)
+var STATUS_RANK = { received: 1, calling: 2, scheduled: 3, incomplete: 3, unreachable: 2, completed: 4 };
 
 function buildPatient(payload) {
   var rawStatus = extractField(payload, ['status', 'Status', 'SCHEDULING STATUS', 'appointmentStatus', 'appointment_status']) || 'received';
@@ -325,7 +335,9 @@ function sendResetEmail(toEmail, resetLink) {
 // Fires whenever a patient status changes. Notifies dg-homecare_admin@bmc.org
 // ---------------------------------------------------------------------------
 function sendStatusEmail(patient, newStatus, oldStatus) {
-  var toEmail = BMC_NOTIFY_EMAIL;
+  // Send to both BMC admin and nurse DG — filter out any empty values
+  var recipients = [BMC_NOTIFY_EMAIL, NURSE_DG_EMAIL].filter(function(e) { return e && e.trim(); });
+  var toEmail = recipients.join(', ');
   var statusLabels = {
     received:    'Order Received',
     scheduled:   'Appointment Scheduled',
@@ -373,7 +385,7 @@ function sendStatusEmail(patient, newStatus, oldStatus) {
     'To view the full tracker, visit <a href="https://bmh-tracker-production.up.railway.app" style="color:#00c5a1">bmh-tracker-production.up.railway.app</a>' +
     '</div></div></div>';
 
-  console.log('[NOTIFY] Status change -> ' + toEmail + ' | Patient: ' + patientName + ' | ' + oldLabel + ' -> ' + newLabel);
+  console.log('[NOTIFY] Status change -> [' + toEmail + '] | Patient: ' + patientName + ' | ' + oldLabel + ' -> ' + newLabel);
 
   if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS) {
     console.log('[NOTIFY] No SMTP configured — notification logged only');
@@ -784,10 +796,11 @@ app.patch('/api/patients/:id', requireAdmin, function(req, res) {
             [crypto.randomUUID(), req.session.user.email, req.session.user.name, req.session.role, 'update_patient', id, new Date().toISOString(), req.headers['x-forwarded-for'] || req.ip]
           ).catch(function(e) { console.log('[ACCESS LOG]', e.message); });
         }
-        // Fire BMC status notification if status changed
-        var newStatus = updates.status || result.rows[0].status;
-        if (updates.status && updates.status !== result.rows[0]._prev_status) {
-          sendStatusEmail(result.rows[0], newStatus, updates._prev_status || 'previous')
+        // Fire BMC notification — only on meaningful stage changes
+        // Fires when: scheduled (appt confirmed) or completed (collection done)
+        var notifyStatuses = ['scheduled', 'completed'];
+        if (updates.status && notifyStatuses.indexOf(updates.status) !== -1) {
+          sendStatusEmail(result.rows[0], updates.status, req.body._prev_status || 'previous')
             .catch(function(e) { console.log('[NOTIFY ERROR]', e.message); });
         }
         res.json(result.rows[0]);
