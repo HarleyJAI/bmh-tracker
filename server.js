@@ -34,6 +34,7 @@ var BMC_NOTIFY_EMAIL  = process.env.BMC_NOTIFY_EMAIL || 'dg-homecare_admin@bmc.o
 var SMTP_HOST         = process.env.SMTP_HOST      || '';
 var SMTP_PORT         = parseInt(process.env.SMTP_PORT || '587', 10);
 var SMTP_USER         = process.env.SMTP_USER      || '';
+var SMTP_FROM         = process.env.SMTP_FROM      || 'noreply@beyondmobilehealth.com';
 var SMTP_PASS         = process.env.SMTP_PASS      || '';
 var AZURE_TENANT_ID   = process.env.AZURE_TENANT_ID   || '';
 var AZURE_CLIENT_ID   = process.env.AZURE_CLIENT_ID   || '';
@@ -299,7 +300,7 @@ function sendResetEmail(toEmail, resetLink) {
     });
 
     return transporter.sendMail({
-      from: '"BMH Tracker" <' + SMTP_USER + '>',
+      from: '"BMH Tracker" <' + SMTP_FROM + '>',
       to: toEmail,
       subject: 'BMH Tracker — Password Reset',
       html: '<div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px">' +
@@ -388,7 +389,7 @@ function sendStatusEmail(patient, newStatus, oldStatus) {
       auth: { user: SMTP_USER, pass: SMTP_PASS }
     });
     return transporter.sendMail({
-      from: '"BMH Tracker" <' + SMTP_USER + '>',
+      from: '"BMH Tracker" <' + SMTP_FROM + '>',
       to: toEmail,
       subject: subject,
       html: htmlBody
