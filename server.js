@@ -711,11 +711,8 @@ app.get('/auth/logout', function(req, res) {
 // ---------------------------------------------------------------------------
 // Root route
 // ---------------------------------------------------------------------------
-app.get('/', requireAuth, function(req, res) {
-  if (req.session.role === 'admin') {
-    return res.redirect('/dispatch');
-  }
-  res.sendFile(path.join(__dirname, 'public', 'client.html'));
+app.get('/', function(req, res) {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 // ---------------------------------------------------------------------------
