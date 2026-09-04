@@ -537,6 +537,13 @@ var sb=supabase.createClient(SUPA_URL,SUPA_KEY);
 
 var patients=[],currentQueue='all',openId=null,impRows=[],selProv='all';
 var currentUser=null,currentProfile=null,soundOn=true,simActive=false,simStep=0;
+
+// Returns Authorization header with Supabase Bearer token for Railway API calls
+async function authHeader(){
+  var s=await sb.auth.getSession();
+  var token=s&&s.data&&s.data.session&&s.data.session.access_token;
+  return token?{'Authorization':'Bearer '+token,'Content-Type':'application/json'}:{'Content-Type':'application/json'};
+}
 var POLL=30000,pollTimer=null;
 
 var PROVIDERS=['Chermaine Morson','Ivy','Jamie','Breana','Jack','Alex'];
@@ -729,7 +736,8 @@ async function logAccess(action,recordId){
 // DATA
 async function loadPatients(){
   try{
-    var r=await fetch('/api/patients');
+    var h=await authHeader();
+    var r=await fetch('/api/patients',{headers:h});
     if(!r.ok)throw new Error('HTTP '+r.status);
     var data=await r.json();
     if(Array.isArray(data)){
@@ -744,7 +752,7 @@ async function loadPatients(){
 
 async function apiPatch(id,data){
   try{
-    var r=await fetch('/api/patients/'+id,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+    var h=await authHeader();var r=await fetch('/api/patients/'+id,{method:'PATCH',headers:h,body:JSON.stringify(data)});
     if(!r.ok)throw new Error('HTTP '+r.status);
     await logAccess('update_patient',id);
     return await r.json();
@@ -753,7 +761,7 @@ async function apiPatch(id,data){
 
 async function apiPost(data,cb){
   try{
-    var r=await fetch('/api/patients',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+    var h=await authHeader();var r=await fetch('/api/patients',{method:'POST',headers:h,body:JSON.stringify(data)});
     if(!r.ok)throw new Error('HTTP '+r.status);
     var p=await r.json();
     await logAccess('add_patient',p.id);
@@ -762,7 +770,7 @@ async function apiPost(data,cb){
 }
 
 async function apiDelete(id){
-  try{await fetch('/api/patients/'+id,{method:'DELETE'});await logAccess('delete_patient',id)}
+  try{var h=await authHeader();await fetch('/api/patients/'+id,{method:'DELETE',headers:h});await logAccess('delete_patient',id)}
   catch(err){toast('Delete failed: '+err.message,'error')}
 }
 
