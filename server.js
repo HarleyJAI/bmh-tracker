@@ -87,29 +87,32 @@ function requireAuth(req, res, next) {
   // 1. Railway session (admin password login or Microsoft SSO)
   if (req.session && (req.session.role === 'admin' || req.session.role === 'client')) return next();
 
-  // 2. Supabase Bearer token — BMC clients logging in via Supabase auth on index.html
-  //    We verify the token is a valid JWT signed by the correct project,
-  //    extract the email, derive the org, mint a Railway session, then proceed.
+  // 2. Supabase Bearer token — sent by index.html via Authorization header
+  //    Decode the JWT, extract email and role, set session, proceed.
   var authHeader = req.headers.authorization || '';
   var token = authHeader.replace('Bearer ', '').trim();
   if (token && token.split('.').length === 3) {
     try {
-      // Decode payload (no secret check needed — Supabase already verified at login)
-      // We trust the email because it came from a Supabase-authenticated session.
-      var payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
-      var email = payload.email || payload.sub || '';
+      var raw = token.split('.')[1];
+      // Pad base64 if needed
+      while (raw.length % 4) raw += '=';
+      var payload = JSON.parse(Buffer.from(raw, 'base64url').toString('utf8'));
+      var email = payload.email || '';
+      var role  = payload.role || 'authenticated';
       if (email && email.indexOf('@') !== -1) {
-        req.session.role = 'client';
+        // Admin email gets admin role, everyone else gets client
+        var sessionRole = (email === ADMIN_EMAIL || role === 'service_role') ? 'admin' : 'client';
+        req.session.role = sessionRole;
         req.session.user = { name: email.split('@')[0], email: email };
-        console.log('[AUTH] Supabase token accepted for:', email);
+        console.log('[AUTH] Supabase JWT accepted — email:', email, '| role:', sessionRole);
         return next();
       }
     } catch(e) {
-      console.log('[AUTH] Token decode error:', e.message);
+      console.log('[AUTH] JWT decode error:', e.message);
     }
   }
 
-  // 3. If the request is an API call return 401, otherwise redirect to login
+  // 3. API calls return 401; page requests redirect to login
   if (req.path.startsWith('/api/')) return res.status(401).json({ error: 'Unauthorized' });
   res.redirect('/login');
 }
@@ -711,8 +714,11 @@ app.get('/auth/logout', function(req, res) {
 // ---------------------------------------------------------------------------
 // Root route
 // ---------------------------------------------------------------------------
-app.get('/', function(req, res) {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+app.get('/', requireAuth, function(req, res) {
+  if (req.session.role === 'admin') {
+    return res.redirect('/dispatch');
+  }
+  res.sendFile(path.join(__dirname, 'public', 'client.html'));
 });
 
 // ---------------------------------------------------------------------------
